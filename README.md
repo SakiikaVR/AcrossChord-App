@@ -82,9 +82,13 @@ js/app.js       … アプリケーションロジック
 
 ### サードパーティ / 収録コンテンツ
 
+JavaScript・CSS はすべて自前実装で、**外部のオープンソース JS ライブラリやフレームワークは使用していません**（jQuery / React などへの依存なし）。外部から読み込んでいるのは以下のアイコンフォント1点のみです。
+
 | 対象 | ライセンス |
 |---|---|
-| [Material Icons](https://fonts.google.com/icons) (Google) — CDN 経由で読み込み | [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
+| [Material Icons](https://fonts.google.com/icons) (Google) — Google Fonts CDN 経由で読み込み | [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
 | サンプル曲「ふるさと」（作詞: 高野辰之(1947年没) / 作曲: 岡野貞一(1941年没)） | パブリックドメイン |
+
+コードダイアグラム（SVG）、チューナーのピッチ検出（自己相関法）、ChordPro パーサ等もすべて本リポジトリ内のコード ([js/app.js](js/app.js)) で実装しています。
 
 > **注意:** 市販楽曲のコード譜・歌詞には著作権があります。本アプリで作成したコード譜を公開・共有する際は、各楽曲の権利にご注意ください（個人的な利用の範囲で使うことを想定しています）。
