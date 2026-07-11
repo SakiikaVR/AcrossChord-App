@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<!--
+  コードノート (Chord Note)
+  Copyright (c) 2026 SakiikaVR
+  Released under the MIT License
+  https://opensource.org/licenses/MIT
+-->
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>コードノート</title>
+<meta name="description" content="コード譜の作成・閲覧・移調・チューナーをブラウザだけで。オフラインで使えるモバイル向けコード譜ノートアプリ。">
+<meta name="theme-color" content="#F5F5F5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- Material Icons (c) Google — Apache License 2.0 -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="app-header" id="app-header">
+  <div class="header-left">
+    <span class="material-icons back-btn" id="selection-cancel-btn" onclick="handleCancelAction()" style="display:none">close</span>
+    <span class="material-icons back-btn" id="header-back-btn" onclick="handleBack()" style="display:none">arrow_back_ios</span>
+    <span class="header-title" id="header-title">コードノート</span>
+  </div>
+  <div class="header-right">
+    <div class="icon-btn" id="selection-delete-btn" onclick="handleDeleteAction()" style="display:none;color:var(--danger)"><span class="material-icons">delete</span></div>
+    <div id="normal-header-actions" style="display:flex;align-items:center;gap:2px">
+      <div class="icon-btn" id="header-scroll-btn" onclick="toggleScrollPanel()" style="display:none;color:var(--primary)"><span class="material-icons">arrow_downward</span></div>
+      <div class="header-chip" id="header-key-chip" onclick="openSettingsSheet()" style="display:none"><span class="material-icons" style="font-size:1rem;margin-right:4px">music_note</span><span id="header-key-text">Key: C</span></div>
+      <div class="header-chip" id="header-capo-chip" onclick="openSettingsSheet()" style="display:none"><span id="header-capo-text">Capo: 0</span></div>
+      <div class="icon-btn" id="header-playlist-btn" onclick="togglePlaylistModal(true)" style="color:#e91e63"><span class="material-icons">favorite</span></div>
+      <div class="icon-btn" id="header-zoom-btn" onclick="toggleZoomPanel()" style="display:none"><span class="material-icons">zoom_in</span></div>
+      <div class="icon-btn" id="header-edit-btn" onclick="enterEditMode()" style="display:none"><span class="material-icons">edit</span></div>
+    </div>
+  </div>
+</header>
+<div id="zoom-control-panel" class="zoom-control-panel">
+  <div class="icon-btn" onclick="zoomOut()"><span class="material-icons">remove</span></div>
+  <input type="range" class="scroll-slider" id="zoom-slider" min="50" max="300" value="100" oninput="updateZoomFromSlider()" style="flex:1">
+  <div class="icon-btn" onclick="zoomIn()"><span class="material-icons">add</span></div>
+  <span id="zoom-val-text" style="font-size:.9rem;width:44px;text-align:right">100%</span>
+  <div class="icon-btn" onclick="closeZoomPanel()" style="color:var(--danger)"><span class="material-icons">close</span></div>
+</div>
+<main id="main-content">
+  <section id="tab-view" class="tab-section active">
+    <div id="view-list">
+      <div class="search-container"><div class="search-box"><span class="material-icons" style="color:#999">search</span><input type="search" class="search-input" id="song-search" placeholder="曲名・アーティスト名" oninput="filterSongs()"></div></div>
+      <div id="song-list-container"></div>
+      <div class="fab" id="fab-add" onclick="createNewSong()"><span class="material-icons">add</span></div>
+    </div>
+    <div id="view-detail" class="detail-view"><div id="zoom-container"><div id="score-output"></div></div></div>
+  </section>
+  <div id="scroll-panel" class="scroll-panel">
+    <button class="scroll-btn-circle" id="scroll-play-btn" onclick="toggleAutoScroll()"><span class="material-icons">play_arrow</span></button>
+    <div class="scroll-slider-container"><div class="scroll-speed-label">Speed</div><input type="range" class="scroll-slider" id="scroll-speed" min="1" max="50" value="10"></div>
+    <div class="icon-btn" onclick="closeScrollPanel()" style="color:#aaa"><span class="material-icons">close</span></div>
+  </div>
+  <section id="tab-edit" class="tab-section">
+    <div class="editor-container"><div class="editor-help">{title:曲名} {artist:歌手名} {key:C} で情報を指定<br>[C]のようにコードを記述</div><textarea id="edit-source" class="notepad-area" placeholder="{title: 曲名}&#10;{artist: アーティスト}&#10;{key: C}&#10;&#10;[Am7]歌詞..."></textarea></div>
+    <div class="fab" onclick="saveCurrentSong()"><span class="material-icons">check</span></div>
+  </section>
+  <section id="tab-tuner" class="tab-section"><div class="tuner-card"><div style="font-weight:bold;color:#78909c;margin-bottom:16px">CHROMATIC TUNER</div><div style="font-size:5rem;font-weight:bold;line-height:1;margin:10px 0" id="tuner-note">--</div><div style="color:#aaa;margin-bottom:20px"><span id="tuner-freq">0</span> Hz</div><div class="meter-container"><div class="center-marker"></div><div class="needle" id="tuner-needle"></div></div><button id="tuner-toggle-btn" onclick="toggleTuner()" style="background:rgba(255,255,255,.2);color:white;padding:10px 30px;border-radius:20px;font-size:1rem;cursor:pointer">開始</button></div></section>
+  <section id="tab-settings" class="tab-section">
+    <div class="settings-section-title">表記設定</div><div class="segment-control"><div class="segment-option selected" id="opt-sharp" onclick="setNotation('sharp')"># Sharp</div><div class="segment-option" id="opt-flat" onclick="setNotation('flat')">♭ Flat</div></div>
+    <div class="settings-section-title">ギターチューニング</div><div class="settings-list" id="tuning-list"><div class="settings-item" data-tuning="std" onclick="setTuning('std')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Standard</div><div class="settings-desc">E A D G B E</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="dropd" onclick="setTuning('dropd')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Drop D</div><div class="settings-desc">D A D G B E</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="half" onclick="setTuning('half')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">半音下げ</div><div class="settings-desc">E♭ A♭ D♭ G♭ B♭ E♭</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="dropcs" onclick="setTuning('dropcs')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Drop C#</div><div class="settings-desc">C# G# C# F# A# D#</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="whole" onclick="setTuning('whole')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">全音下げ</div><div class="settings-desc">D G C F A D</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="dropc" onclick="setTuning('dropc')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Drop C</div><div class="settings-desc">C G C F A D</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="dropb" onclick="setTuning('dropb')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Drop B</div><div class="settings-desc">B F# B E G# C#</div></div><span class="material-icons settings-arrow tuning-check">check</span></div></div><div class="settings-section-title">データ管理</div><div class="settings-list"><div class="settings-item" onclick="exportData()"><span class="material-icons settings-icon">download</span><div class="settings-content"><div class="settings-title">ファイルに保存</div><div class="settings-desc">ライブラリをJSONファイルとして保存</div></div><span class="material-icons settings-arrow">chevron_right</span></div><div class="settings-item" onclick="document.getElementById('import-file').click()"><span class="material-icons settings-icon">upload</span><div class="settings-content"><div class="settings-title">ファイルから読込</div><div class="settings-desc">JSONファイルを読み込んで追加</div></div><span class="material-icons settings-arrow">chevron_right</span></div><input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importData(this)"><div class="settings-item" onclick="resetAllData()"><span class="material-icons settings-icon" style="color:var(--danger)">delete_forever</span><div class="settings-content"><div class="settings-title" style="color:var(--danger)">全データ削除</div><div class="settings-desc">曲・プレイリスト・設定をすべて消去</div></div><span class="material-icons settings-arrow">chevron_right</span></div></div>
+    <div class="settings-section-title">アプリ情報</div><div class="settings-list"><div class="settings-item"><span class="material-icons settings-icon">info</span><div class="settings-content"><div class="settings-title">コードノート</div><div class="settings-desc">v1.0.0 / MIT License</div></div></div><div class="settings-item" onclick="window.open('https://github.com/SakiikaVR/chord-note','_blank')"><span class="material-icons settings-icon">code</span><div class="settings-content"><div class="settings-title">ソースコード</div><div class="settings-desc">GitHub で公開しています</div></div><span class="material-icons settings-arrow">open_in_new</span></div></div>
+  </section>
+</main>
+<footer class="app-footer" id="app-footer"><nav class="bottom-nav"><div class="nav-item active" onclick="switchMainTab('view',this)"><span class="material-icons">library_music</span><span>コード譜</span></div><div class="nav-item" onclick="switchMainTab('tuner',this)"><span class="material-icons">graphic_eq</span><span>チューナー</span></div><div class="nav-item" onclick="switchMainTab('settings',this)"><span class="material-icons">settings</span><span>設定</span></div></nav></footer>
+<div class="modal-overlay" id="playlist-modal"><div class="modal-card" style="height:72dvh"><div class="playlist-header"><div style="display:flex;align-items:center;min-width:0"><span class="material-icons icon-btn" id="pl-back-btn" style="display:none" onclick="history.back()">arrow_back_ios</span><span style="font-weight:bold;font-size:1.08rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="pl-title">プレイリスト</span></div><div style="display:flex"><div class="icon-btn" id="pl-delete-btn" style="display:none;color:var(--danger)" onclick="deleteSelectedPlaylists()"><span class="material-icons">delete</span></div><span class="material-icons icon-btn" id="pl-close-btn" onclick="closePlaylistModalCompletely()">close</span><span class="material-icons icon-btn" id="pl-selection-cancel" style="display:none" onclick="exitPlaylistSelectionMode()">close</span></div></div><div class="modal-body"><div id="playlist-index-view"><div id="playlist-list-container"></div></div><div id="playlist-detail-view" style="display:none"><div id="playlist-songs-container"></div></div></div><div class="modal-footer" id="playlist-footer-actions"></div></div></div>
+<div class="modal-overlay" id="song-picker-modal" style="z-index:160"><div class="modal-card"><div class="modal-header"><span>曲を選択</span><span class="material-icons icon-btn" onclick="closeSongPicker()">close</span></div><div class="modal-body" id="picker-list"></div><div class="modal-footer"><button class="primary-btn" onclick="addSongsToPlaylist()">追加</button></div></div></div>
+<div class="bottom-sheet-overlay" id="sheet-overlay" onclick="closeAllSheets()"></div>
+<div class="bottom-sheet" id="settings-sheet"><div class="sheet-title">表示設定 & Key & Capo</div><div class="radio-group"><div class="radio-item selected" onclick="setMode('text',this)" id="mode-text-btn"><div class="radio-left"><span class="material-icons">text_fields</span><span>コード名（タップで押さえ方）</span></div></div><div class="radio-item" onclick="setMode('power',this)" id="mode-power-btn"><div class="radio-left"><span class="material-icons">bolt</span><span>Power Chord (5th)</span></div></div><div class="radio-item" onclick="setMode('nns',this)" id="mode-nns-btn"><div class="radio-item-content"><div class="radio-left"><span class="material-icons">looks_one</span><span>NNS (度数)</span></div><select id="compact-key-picker" class="compact-key-select" onclick="event.stopPropagation()" onchange="changeKeyFromCompact(this)"></select></div></div><div class="radio-item"><div class="radio-item-content"><div class="radio-left"><span class="material-icons">tune</span><span>Capo</span></div><select id="compact-capo-picker" class="compact-key-select" onclick="event.stopPropagation()" onchange="changeCapo(this)"></select></div></div><div class="radio-item" onclick="toggleDiag()" id="diag-toggle-btn"><div class="radio-item-content"><div class="radio-left"><span class="material-icons">grid_on</span><span>ダイアグラムを常に表示</span></div><span class="material-icons" id="diag-check" style="color:var(--primary);opacity:0">check</span></div></div></div><button class="sheet-close-btn" onclick="closeAllSheets()">閉じる</button></div>
+<div id="chord-popup" class="chord-popup"><span class="material-icons chord-popup-close" onclick="closeChordPopup()">close</span><div id="chord-popup-body"></div></div>
+<div id="toast" class="toast"></div>
+<script src="js/app.js"></script>
+</body>
+</html>
