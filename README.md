@@ -3,7 +3,7 @@
 ブラウザだけで動く、モバイル向けのコード譜作成・閲覧 Web アプリです。
 サーバー不要・アカウント不要で、データはすべて端末の `localStorage` に保存されます。
 
-**▶ デモ (GitHub Pages): https://sakiikavr.github.io/chord-note/**
+**▶ デモ (GitHub Pages): https://sakiikavr.github.io/AcrossChord/**
 
 ## 機能
 
