@@ -494,8 +494,9 @@ body.hide-nav .bottom-nav { display: none; }
 .chord-name:active, .chord-name.playing { background: color-mix(in srgb, var(--primary-color) 22%, transparent); }
 .chord-name.nc { color: var(--sub-text-color); font-weight: 400; cursor: default; }
 .chord-diagram {
-    width: 58px; height: 52px; background: var(--card-bg);
-    border-radius: 5px; border: 1px solid var(--border-color);
+    /* テーマに依存しない固定色 (ダークモードでも反転させない) */
+    width: 58px; height: 52px; background: #ffffff;
+    border-radius: 5px; border: 1px solid rgba(60, 60, 67, 0.16);
 }
 .nns-text-container { line-height: 1.2; white-space: nowrap; margin-bottom: 4px; font-weight: 700; }
 .cn-root { font-size: 1.4rem; color: var(--primary-color); }
@@ -518,7 +519,7 @@ body.hide-nav .bottom-nav { display: none; }
     pointer-events: none; transition: 0.2s;
 }
 .chord-popup.show { transform: translateY(0); opacity: 1; visibility: visible; pointer-events: auto; }
-.chord-popup .chord-diagram { width: 156px; height: 137px; border: none; background: transparent; }
+.chord-popup .chord-diagram { width: 156px; height: 137px; border: none; background: #ffffff; border-radius: 10px; }
 .chord-popup-close {
     position: absolute; top: -10px; right: -10px; width: 32px; height: 32px; border-radius: 50%;
     background: var(--input-bg); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
@@ -773,6 +774,10 @@ body.hide-nav .bottom-nav { display: none; }
                     <div class="settings-value-display" id="accent-value">ブルー</div>
                     <div class="settings-chevron">›</div>
                 </div>
+                <div class="settings-row" id="diagram-row">
+                    <div class="settings-label">ダイアグラムを常に表示<div class="settings-sub">歌詞の上にギターの押さえ方を表示</div></div>
+                    <div class="settings-check">✓</div>
+                </div>
             </div>
         </div>
 
@@ -898,18 +903,19 @@ body.hide-nav .bottom-nav { display: none; }
                 <div class="settings-row" data-mode="nns">
                     <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M10 8l2-1v10"></path></svg></div>
                     <div class="settings-label">NNS (度数)</div>
-                    <div class="settings-check" style="margin-right:10px;">✓</div>
-                    <select id="compact-key-picker" class="form-input" style="width:110px; padding:8px 10px; font-size:13px;"></select>
+                    <div class="settings-check">✓</div>
                 </div>
-                <div class="settings-row" style="cursor:default;">
+                <div class="settings-row" id="key-row">
+                    <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>
+                    <div class="settings-label">Key</div>
+                    <div class="settings-value-display" id="key-value">C / Am</div>
+                    <div class="settings-chevron">›</div>
+                </div>
+                <div class="settings-row" id="capo-row">
                     <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg></div>
                     <div class="settings-label">Capo</div>
-                    <select id="compact-capo-picker" class="form-input" style="width:110px; padding:8px 10px; font-size:13px;"></select>
-                </div>
-                <div class="settings-row" id="diag-toggle-row">
-                    <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg></div>
-                    <div class="settings-label">ダイアグラムを常に表示</div>
-                    <div class="settings-check" id="diag-check">✓</div>
+                    <div class="settings-value-display" id="capo-value">0 (なし)</div>
+                    <div class="settings-chevron">›</div>
                 </div>
             </div>
             <button class="btn-cancel" id="sheet-close-btn" style="margin-top:16px;">閉じる</button>
@@ -973,13 +979,14 @@ const ENHARMONIC={'A#':'Bb','Bb':'A#','C#':'Db','Db':'C#','D#':'Eb','Eb':'D#','F
 const TUNINGS={std:{shift:0,drop:false,label:'Standard',desc:'E A D G B E'},dropd:{shift:0,drop:true,label:'Drop D',desc:'D A D G B E'},half:{shift:1,drop:false,label:'半音下げ',desc:'E♭ A♭ D♭ G♭ B♭ E♭'},dropcs:{shift:1,drop:true,label:'Drop C#',desc:'C# G# C# F# A# D#'},whole:{shift:2,drop:false,label:'全音下げ',desc:'D G C F A D'},dropc:{shift:2,drop:true,label:'Drop C',desc:'C G C F A D'},dropb:{shift:3,drop:true,label:'Drop B',desc:'B F# B E G# C#'}};
 const ACCENTS={blue:{c:'#7bb3d7',label:'ブルー'},pink:{c:'#f79ecd',label:'ピンク'},red:{c:'#ff453a',label:'レッド'},orange:{c:'#ff9f0a',label:'オレンジ'}};
 const THEMES={dark:{label:'ダーク'},light:{label:'ライト'}};
-function diagInk(){return themeId==='light'?'#1c1c1e':'#ffffff'} // ダイアグラム描画色(テーマ連動)
+function diagInk(){return '#1c1c1e'} // ダイアグラム描画色(テーマに依存しない固定色)
 
 /* ============ 状態 ============ */
 let notationMode=localStorage.getItem('cv_notation')||'sharp';
 let tuningId=localStorage.getItem('cv_tuning')||'std'; if(!TUNINGS[tuningId])tuningId='std';
 let accentId=localStorage.getItem('cv_accent')||'blue'; if(!ACCENTS[accentId])accentId='blue';
 let themeId=localStorage.getItem('cv_theme')||'dark'; if(!THEMES[themeId])themeId='dark';
+let diagramOn=localStorage.getItem('cv_diagram')!=='off'; // 既定で有効
 let songLibrary=[],playlists=[];
 let currentSongId=null,currentPlaylistId=null;
 let isSelectionMode=false,isPlaylistSelectionMode=false;
@@ -1183,7 +1190,7 @@ function updateDetailView(s){
     $('capo-chip-text').textContent='Capo: '+(s.capo||0);
     const mode=s.mode==='diagram'?'text':(s.mode||'text');
     $('mode-chip-text').textContent=mode==='power'?'Power Chord':mode==='nns'?'NNS':'コード名';
-    updateModeUI(mode);updateDiagUI(s);updateKeyUI(s.key||'C');updateCapoUI(s.capo||0);
+    updateModeUI(mode);updateKeyUI(s.key||'C');updateCapoUI(s.capo||0);
     renderScore(s);
 }
 
@@ -1239,7 +1246,7 @@ function renderScore(s){
         if(tr===''){html+='<div style="height:14px"></div>';return;}
         if(!line.includes('[')){html+=`<div class="score-line-normal">${escapeHTML(line)}</div>`;return;}
         const mode=(s.mode==='diagram')?'text':(s.mode||'text');
-        const diag=!!s.diag||s.mode==='diagram';
+        const diag=diagramOn;
         let row='<div class="score-row">';
         let remaining=line;
         const first=remaining.indexOf('[');
@@ -1399,18 +1406,18 @@ function stopAutoScroll(){
 }
 
 /* ============ 表示設定 ============ */
-function setNotation(mode){notationMode=mode;localStorage.setItem('cv_notation',mode);updateSettingsUI();initCompactKeySelect();if(currentSongId)updateDetailView(getSong(currentSongId))}
+function setNotation(mode){notationMode=mode;localStorage.setItem('cv_notation',mode);updateSettingsUI();if(currentSongId)updateDetailView(getSong(currentSongId))}
 function updateSettingsUI(){
     $('notation-sharp-row').classList.toggle('selected',notationMode==='sharp');
     $('notation-flat-row').classList.toggle('selected',notationMode==='flat');
     $('accent-value').textContent=ACCENTS[accentId].label;
     $('theme-value').textContent=THEMES[themeId].label;
+    $('diagram-row').classList.toggle('selected',diagramOn);
 }
 function updateModeUI(mode){document.querySelectorAll('#settings-sheet .settings-row[data-mode]').forEach(e=>e.classList.toggle('selected',e.dataset.mode===mode))}
 function openSettingsSheet(){if(!currentSongId){M_toast('曲を選択してください');return}$('settings-sheet').classList.add('show')}
 function closeSettingsSheet(){$('settings-sheet').classList.remove('show')}
-function toggleDiag(){const s=getSong(currentSongId);if(!s)return;s.diag=!(s.diag||s.mode==='diagram');if(s.mode==='diagram')s.mode='text';saveLibrary();updateDetailView(s)}
-function updateDiagUI(s){const on=!!s.diag||s.mode==='diagram';$('diag-toggle-row').classList.toggle('selected',on)}
+function toggleDiag(){diagramOn=!diagramOn;localStorage.setItem('cv_diagram',diagramOn?'on':'off');updateSettingsUI();if(currentSongId){const s=getSong(currentSongId);if(s)renderScore(s)}}
 function setMode(m){const s=getSong(currentSongId);if(!s)return;s.mode=m;saveLibrary();updateDetailView(s)}
 function setTuning(id){if(!TUNINGS[id])id='std';tuningId=id;localStorage.setItem('cv_tuning',id);updateTuningUI();if(currentSongId){const sg=getSong(currentSongId);if(sg)renderScore(sg)}}
 function renderTuningList(){
@@ -1449,25 +1456,23 @@ async function pickAccent(){
 }
 
 /* ---- Key / Capo ---- */
-function initCompactKeySelect(){
-    const p=$('compact-key-picker');if(!p)return;
-    const cur=p.value;p.innerHTML='';
-    for(let i=0;i<12;i++){
-        const root=notationMode==='sharp'?NOTES[i]:NOTES_FLAT[i];
-        const o=document.createElement('option');
-        o.value=NOTES[i];o.textContent=`${root} / ${getRelativeMinor(root)}`;
-        p.appendChild(o);
-    }
-    if(cur)p.value=cur;
+function keyLabel(i){const root=notationMode==='sharp'?NOTES[i]:NOTES_FLAT[i];return `${root} / ${getRelativeMinor(root)}`}
+async function pickKey(){
+    const s=getSong(currentSongId);if(!s)return;
+    const cur=noteIndex(s.key||'C');
+    const opts=[];for(let i=0;i<12;i++)opts.push({label:keyLabel(i),active:i===cur});
+    const i=await actionSheet('Key',opts);if(i<0)return;
+    s.key=NOTES[i];saveLibrary();updateDetailView(s);
 }
-function initCapoSelect(){
-    const p=$('compact-capo-picker');p.innerHTML='';
-    for(let i=0;i<12;i++){const o=document.createElement('option');o.value=i;o.textContent=i===0?'0 (なし)':String(i);p.appendChild(o)}
+async function pickCapo(){
+    const s=getSong(currentSongId);if(!s)return;
+    const cur=s.capo||0;
+    const opts=[];for(let i=0;i<12;i++)opts.push({label:i===0?'0 (なし)':String(i),active:i===cur});
+    const i=await actionSheet('Capo',opts);if(i<0)return;
+    s.capo=i;saveLibrary();updateDetailView(s);
 }
-function changeKeyFromCompact(el){const s=getSong(currentSongId);if(!s)return;s.key=el.value;saveLibrary();updateDetailView(s)}
-function updateKeyUI(key){const p=$('compact-key-picker');const i=noteIndex(key);if(p&&i>=0)p.value=NOTES[i]}
-function changeCapo(el){const s=getSong(currentSongId);if(!s)return;s.capo=parseInt(el.value);saveLibrary();updateDetailView(s)}
-function updateCapoUI(capo){$('compact-capo-picker').value=capo}
+function updateKeyUI(key){const i=noteIndex(key);$('key-value').textContent=i>=0?keyLabel(i):String(key)}
+function updateCapoUI(capo){$('capo-value').textContent=capo===0?'0 (なし)':String(capo)}
 
 /* ============ データ管理 ============ */
 function exportData(){
@@ -1695,7 +1700,7 @@ function init(){
     if(!localStorage.getItem('cv_tuning')&&(songLibrary||[]).some(x=>x&&x.dropd)){tuningId='dropd';localStorage.setItem('cv_tuning','dropd')}
     loadPlaylists();
     renderTuningList();
-    initCompactKeySelect();initCapoSelect();updateSettingsUI();
+    updateSettingsUI();
     if(songLibrary.length===0){songLibrary=[structuredClone(SAMPLE_SONG)];saveLibrary()}
     updateSongCount();
     renderSongList();
@@ -1741,9 +1746,9 @@ function init(){
     document.querySelectorAll('#settings-sheet .settings-row[data-mode]').forEach(row=>{
         row.addEventListener('click',e=>{if(e.target.tagName==='SELECT')return;setMode(row.dataset.mode)});
     });
-    $('diag-toggle-row').onclick=toggleDiag;
-    $('compact-key-picker').addEventListener('change',e=>changeKeyFromCompact(e.target));
-    $('compact-capo-picker').addEventListener('change',e=>changeCapo(e.target));
+    $('diagram-row').onclick=toggleDiag;
+    $('key-row').onclick=pickKey;
+    $('capo-row').onclick=pickCapo;
     $('sheet-close-btn').onclick=closeSettingsSheet;
     $('sheet-close-x').onclick=closeSettingsSheet;
     $('settings-sheet').addEventListener('click',e=>{if(e.target===$('settings-sheet'))closeSettingsSheet()});
