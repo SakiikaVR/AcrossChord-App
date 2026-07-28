@@ -1,81 +1,1785 @@
 <!DOCTYPE html>
 <!--
-  コードノート (Chord Note)
-  Copyright (c) 2026 SakiikaVR
-  Released under the MIT License
+  コードノート (Chord Note) × オンコミ デザイン
+  Functionality: AcrossChord-App (Chord Note) - Copyright (c) 2026 SakiikaVR / MIT License
+  Design:        ON-Comi (オンコミ)            - Copyright (c) SakiikaVR / MIT License
   https://opensource.org/licenses/MIT
 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>コードノート</title>
-<meta name="description" content="コード譜の作成・閲覧・移調・チューナーをブラウザだけで。オフラインで使えるモバイル向けコード譜ノートアプリ。">
-<meta name="theme-color" content="#F5F5F5">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<!-- Material Icons (c) Google — Apache License 2.0 -->
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+<title>コードノート</title>
+<style>
+/* ============================================================
+   オンコミ (ON-Comi) デザインシステム — style.css 由来
+   ============================================================ */
+:root {
+    --primary-color: #7bb3d7;
+    --danger-color: #ff453a;
+    --bg-color: #000000;
+    --card-bg: #1c1c1e;
+    --text-color: #ffffff;
+    --sub-text-color: #98989f;
+    --border-color: rgba(84, 84, 88, 0.48);
+    --input-bg: rgba(118, 118, 128, 0.24);
+    --nav-bg: #161618;
+    --blur-bg: rgba(22, 22, 24, 0.82);
+    --folder-color: #f79ecd;
+    --icon-color: #aaaaaa;
+    --nav-height: 56px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --nav-total: calc(var(--nav-height) + var(--safe-bottom));
+    --selection-bar-height: calc(64px + var(--safe-bottom));
+    --radius-card: 12px;
+    --radius-sheet: 20px;
+    --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.4);
+    --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+/* ---- ライトモード ---- */
+html[data-theme="light"] {
+    --bg-color: #f2f2f7;
+    --card-bg: #ffffff;
+    --text-color: #1c1c1e;
+    --sub-text-color: #6e6e73;
+    --border-color: rgba(60, 60, 67, 0.16);
+    --input-bg: rgba(118, 118, 128, 0.12);
+    --nav-bg: #f9f9fb;
+    --blur-bg: rgba(249, 249, 251, 0.85);
+    --icon-color: #8e8e93;
+    --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.07);
+    --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+html[data-theme="light"] body { background-color: var(--bg-color); }
+html[data-theme="light"] #toast { background: rgba(40, 40, 44, 0.92); }
+html[data-theme="light"] .song-check { border-color: var(--card-bg); }
+html[data-theme="light"] .needle { box-shadow: 0 0 8px color-mix(in srgb, var(--primary-color) 45%, transparent); }
+html { transition: background-color 0.25s; }
+body, .page, .settings-card, .settings-row, .song-group, .list-row, .tuner-card,
+.modal-content, .ios-alert, .action-sheet-group, .chord-popup, .chord-diagram {
+    transition: background-color 0.25s, color 0.25s, border-color 0.25s;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { height: 100%; }
+body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background-color: var(--bg-color); color: var(--text-color);
+    padding-bottom: var(--nav-total);
+    overscroll-behavior: none; user-select: none;
+    -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; }
+.svg-icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.svg-icon-fill { width: 24px; height: 24px; fill: currentColor; stroke: none; }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Modals (iOS bottom-sheet) ---- */
+.modal-overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
+    z-index: 4600; display: none; align-items: flex-end; justify-content: center;
+    animation: fade-in 0.22s ease;
+}
+.modal-overlay.show { display: flex; }
+.modal-content {
+    background: var(--card-bg); width: 100%; max-width: 560px;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 20px 20px calc(20px + var(--safe-bottom));
+    max-height: 88vh; overflow-y: auto;
+    box-shadow: var(--shadow-float);
+    display: flex; flex-direction: column;
+    animation: sheet-up 0.32s cubic-bezier(0.32, 0.72, 0.33, 1);
+}
+@media (min-width: 640px) {
+    .modal-overlay { align-items: center; }
+    .modal-content { width: 90%; max-width: 500px; border-radius: var(--radius-sheet); padding: 20px; }
+}
+.modal-header {
+    font-size: 17px; font-weight: 700; margin-bottom: 16px;
+    padding-bottom: 12px; border-bottom: 1px solid var(--border-color);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.modal-header button {
+    background: var(--input-bg); border: none; color: var(--sub-text-color);
+    width: 30px; height: 30px; border-radius: 50%; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.modal-body { display: flex; flex-direction: column; gap: 15px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.btn-primary {
+    flex: 1; background: var(--primary-color); color: #fff;
+    padding: 13px 16px; border-radius: 12px; border: none;
+    font-weight: 700; font-size: 15px; cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.15s;
+}
+.btn-primary:active { transform: scale(0.97); opacity: 0.85; }
+.btn-cancel {
+    flex: 1; background: var(--input-bg); color: var(--text-color);
+    padding: 13px 16px; border-radius: 12px; border: none;
+    font-weight: 600; font-size: 15px; cursor: pointer;
+    transition: transform 0.1s ease;
+}
+.btn-cancel:active { transform: scale(0.97); }
+
+/* ---- iOS Alert (prompt / confirm) ---- */
+.alert-overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
+    z-index: 5000; display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.alert-overlay.show { display: flex; animation: fade-in 0.18s ease; }
+.ios-alert {
+    background: var(--card-bg); width: 280px; border-radius: 16px;
+    box-shadow: var(--shadow-float); overflow: hidden;
+    display: flex; flex-direction: column; text-align: center;
+    animation: pop 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.ios-alert-body { padding: 20px 16px 16px; }
+.ios-alert-title { font-size: 17px; font-weight: 700; color: var(--text-color); }
+.ios-alert-msg { font-size: 13px; color: var(--text-color); margin-top: 6px; line-height: 1.55; }
+.ios-alert-input {
+    width: 100%; border: none; background: var(--input-bg);
+    font-size: 15px; padding: 10px 12px; outline: none;
+    color: var(--text-color); border-radius: 10px; margin-top: 14px;
+}
+.ios-alert-input:focus { box-shadow: 0 0 0 2px var(--primary-color); }
+.ios-alert-actions { display: flex; border-top: 1px solid var(--border-color); }
+.ios-alert-btn {
+    flex: 1; background: none; border: none; color: var(--primary-color);
+    font-size: 16px; font-weight: 400; cursor: pointer; padding: 13px 0;
+}
+.ios-alert-btn + .ios-alert-btn { border-left: 1px solid var(--border-color); }
+.ios-alert-btn.confirm { font-weight: 700; }
+.ios-alert-btn.danger { color: var(--danger-color); }
+.ios-alert-btn:active { background: var(--input-bg); }
+
+/* ---- iOS Action Sheet ---- */
+.action-sheet-overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4);
+    z-index: 4800; display: none; align-items: flex-end; justify-content: center;
+}
+.action-sheet-overlay.show { display: flex; animation: fade-in 0.18s ease; }
+.action-sheet {
+    width: 100%; max-width: 560px;
+    padding: 8px 10px calc(10px + var(--safe-bottom));
+    animation: sheet-up 0.28s cubic-bezier(0.32, 0.72, 0.33, 1);
+}
+.action-sheet-group {
+    background: var(--card-bg); border-radius: 14px; overflow: hidden;
+    margin-bottom: 8px; box-shadow: var(--shadow-float);
+}
+.action-sheet-title {
+    padding: 12px 16px; text-align: center; font-size: 13px; font-weight: 600;
+    color: var(--sub-text-color); border-bottom: 1px solid var(--border-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.action-sheet-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 16px; text-align: center; position: relative;
+    font-size: 17px; color: var(--primary-color); background: none; border: none; cursor: pointer;
+}
+.action-sheet-btn:not(:last-child) { border-bottom: 1px solid var(--border-color); }
+.action-sheet-btn.danger { color: var(--danger-color); }
+.action-sheet-btn.active { font-weight: 700; }
+.action-sheet-btn .sheet-check { position: absolute; right: 20px; font-weight: 700; }
+.action-sheet-btn:active { background: var(--input-bg); }
+.action-sheet-cancel { font-weight: 700; }
+
+/* ---- Selection bar ---- */
+#selection-bar {
+    position: fixed; bottom: 0; left: 0; width: 100%;
+    height: var(--selection-bar-height);
+    background: var(--blur-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+    border-top: 1px solid var(--border-color);
+    display: none; align-items: flex-start; justify-content: space-between;
+    padding: 7px 10px calc(7px + var(--safe-bottom));
+    z-index: 4500; gap: 8px;
+}
+#selection-bar.show { display: flex; }
+.action-btn {
+    background: var(--input-bg); border: none; border-radius: 12px;
+    padding: 4px 2px; color: var(--text-color); font-weight: 500;
+    cursor: pointer; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    flex: 1; height: 50px; font-size: 10px; white-space: nowrap;
+    transition: transform 0.1s ease;
+}
+.action-btn:active { transform: scale(0.95); }
+.action-btn svg { width: 20px; height: 20px; margin-bottom: 2px; }
+.action-btn.delete { color: var(--danger-color); background: rgba(255, 59, 48, 0.12); }
+.action-btn.primary { color: var(--primary-color); background: color-mix(in srgb, var(--primary-color) 14%, transparent); }
+
+/* ---- Sticky header (frosted glass) ---- */
+.sticky-header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--blur-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+    padding-top: var(--safe-top); padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+h1 {
+    padding: 14px 20px 10px; margin: 0;
+    font-size: 28px; font-weight: 800; letter-spacing: -0.4px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.icon-btn {
+    color: var(--primary-color); cursor: pointer; padding: 4px;
+    display: flex; align-items: center; border: none; background: none;
+    transition: transform 0.1s ease;
+}
+.icon-btn:active { transform: scale(0.9); }
+
+/* ---- Search ---- */
+.search-container { padding: 0 20px 10px; position: relative; }
+.search-icon {
+    position: absolute; left: 32px; top: 10px;
+    width: 17px; height: 17px; color: var(--sub-text-color); pointer-events: none;
+}
+.search-input {
+    width: 100%; padding: 9px 15px 9px 38px; border: none;
+    border-radius: 11px; background: var(--input-bg);
+    color: var(--text-color); outline: none; font-size: 16px;
+    transition: box-shadow 0.2s;
+}
+.search-input::placeholder { color: var(--sub-text-color); }
+.search-input:focus { box-shadow: 0 0 0 2px var(--primary-color); }
+
+/* ---- Filter chips ---- */
+.filter-row { display: flex; gap: 8px; padding: 0 20px; overflow-x: auto; scrollbar-width: none; }
+.filter-row::-webkit-scrollbar { display: none; }
+.filter-chip {
+    padding: 7px 16px; border-radius: 20px; border: none;
+    background: var(--input-bg); font-size: 13px; font-weight: 600;
+    color: var(--text-color); white-space: nowrap; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
+}
+.filter-chip:active { transform: scale(0.95); }
+.filter-chip.active { background-color: var(--primary-color) !important; color: #fff !important; }
+
+/* ---- Empty states ---- */
+.empty-library {
+    text-align: center; padding: 70px 20px;
+    color: var(--sub-text-color); display: flex; flex-direction: column;
+    align-items: center; gap: 12px;
+}
+.empty-library .svg-icon { width: 44px; height: 44px; opacity: 0.4; }
+.empty-library p { margin: 0; font-size: 14px; font-weight: 600; }
+.empty-library span { font-size: 12px; opacity: 0.8; }
+
+/* ---- Forms ---- */
+.form-group label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--sub-text-color); }
+.form-input {
+    width: 100%; padding: 11px 13px; border: none; border-radius: 11px;
+    background: var(--input-bg); color: var(--text-color); outline: none; font-size: 15px;
+}
+.form-input:focus { box-shadow: 0 0 0 2px var(--primary-color); }
+select.form-input { -webkit-appearance: none; appearance: none; }
+
+/* ---- Settings ---- */
+.content-padding { padding: var(--safe-top) 20px 40px; }
+.settings-header { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; }
+.settings-header h1 { padding: 0; margin: 0; }
+.settings-group { margin-bottom: 26px; }
+.settings-group h3 {
+    padding-left: 14px; margin: 0 0 7px; font-size: 12px;
+    color: var(--sub-text-color); text-transform: uppercase;
+    font-weight: 600; letter-spacing: 0.4px;
+}
+.settings-card { background: var(--card-bg); border-radius: var(--radius-card); overflow: hidden; box-shadow: var(--shadow-card); }
+.settings-row {
+    display: flex; align-items: center; padding: 12px 16px;
+    background: var(--card-bg); min-height: 50px; position: relative; cursor: pointer;
+}
+.settings-row:not(:last-child)::after {
+    content: ""; position: absolute; left: 16px; right: 0; bottom: 0;
+    height: 1px; background: var(--border-color);
+}
+.settings-row:active { background: var(--input-bg); }
+.settings-label { flex: 1; font-size: 15px; }
+.settings-sub { font-size: 12px; color: var(--sub-text-color); margin-top: 2px; }
+.settings-value-display { margin-left: auto; color: var(--sub-text-color); font-size: 14px; padding-right: 6px; }
+.settings-chevron { color: var(--sub-text-color); font-size: 17px; font-weight: 600; opacity: 0.6; }
+.settings-check { color: var(--primary-color); font-weight: 800; font-size: 16px; opacity: 0; }
+.settings-row.selected .settings-check { opacity: 1; }
+.settings-icon { margin-right: 13px; color: var(--icon-color); display: flex; }
+.storage-container {
+    text-align: center; padding: 26px; background: var(--card-bg);
+    border-radius: var(--radius-card); margin-bottom: 26px; box-shadow: var(--shadow-card);
+}
+.storage-info { font-size: 34px; font-weight: 800; color: var(--primary-color); letter-spacing: -0.5px; }
+.storage-sub { font-size: 12px; color: var(--sub-text-color); margin-top: 5px; }
+
+/* ---- Pages ---- */
+.page { display: block; visibility: hidden; pointer-events: none; width: 100%; height: calc(100vh - var(--nav-total)); height: calc(100dvh - var(--nav-total)); overflow-y: auto; position: fixed; top: 0; left: 0; background: var(--bg-color); }
+.page.active { visibility: visible; pointer-events: auto; }
+.page.full { height: 100vh; height: 100dvh; z-index: 1200; }
+
+/* ---- Song list (ON-Comi file-row / list style) ---- */
+.index-header {
+    padding: 14px 20px 7px; font-size: 12px; font-weight: 700;
+    color: var(--sub-text-color); text-transform: uppercase; letter-spacing: 0.4px;
+    position: sticky; top: 0;
+}
+.song-group { background: var(--card-bg); border-radius: var(--radius-card); margin: 0 16px; overflow: hidden; box-shadow: var(--shadow-card); }
+.song-item {
+    display: flex; align-items: center; padding: 11px 14px; gap: 13px;
+    cursor: pointer; position: relative; transition: background 0.15s;
+}
+.song-item:not(:last-child)::after {
+    content: ""; position: absolute; left: 66px; right: 0; bottom: 0;
+    height: 1px; background: var(--border-color);
+}
+.song-item:active { background: var(--input-bg); }
+.song-item.selected { background: color-mix(in srgb, var(--primary-color) 16%, transparent); }
+.song-icon {
+    width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 17px; color: #1c1c1e;
+    box-shadow: var(--shadow-card);
+}
+.song-info { flex: 1; min-width: 0; }
+.song-title-list { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.song-artist-list { font-size: 12px; color: var(--sub-text-color); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.song-check {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+    background: var(--primary-color); color: #fff; border: 2px solid #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    animation: pop 0.15s ease;
+}
+/* 五十音インデックス色 (パステル) */
+.idx-a{background:#f6c5b4}.idx-k{background:#f0b9c4}.idx-s{background:#b8ddc6}.idx-t{background:#aed9dd}
+.idx-n{background:#b9d0ef}.idx-h{background:#cfc3ec}.idx-m{background:#e3cdbb}.idx-y{background:#c5cdd8}
+.idx-r{background:#efecf7}.idx-w{background:#b4c4cf}.idx-en{background:#e9e0ab}.idx-def{background:#d4d4d8}
+
+/* ---- Playlist rows (ON-Comi list-row) ---- */
+.list-collection { padding: 12px 20px 110px; display: flex; flex-direction: column; gap: 12px; }
+.list-row {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--card-bg); border-radius: 14px; padding: 12px 14px;
+    box-shadow: var(--shadow-card); cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.list-row:active { transform: scale(0.97); }
+.list-row.selected { outline: 3px solid var(--primary-color); outline-offset: -3px; }
+.list-cover-empty {
+    width: 64px; height: 64px; border-radius: 12px; background: var(--input-bg);
+    display: flex; align-items: center; justify-content: center; color: var(--folder-color); flex-shrink: 0;
+}
+.list-row-info { flex: 1; min-width: 0; }
+.list-row-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-row-count { font-size: 12px; color: var(--sub-text-color); margin-top: 2px; }
+
+/* ---- Bottom nav ---- */
+.bottom-nav {
+    position: fixed; bottom: 0; width: 100%;
+    height: var(--nav-total);
+    padding-bottom: var(--safe-bottom);
+    background: var(--blur-bg);
+    -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid var(--border-color);
+    display: flex; z-index: 1000;
+}
+body.hide-nav .bottom-nav { display: none; }
+.nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; color: var(--sub-text-color); font-size: 10px; font-weight: 600;
+    cursor: pointer; transition: transform 0.12s ease, color 0.2s;
+}
+.nav-item:active { transform: scale(0.9); }
+.nav-item.active { color: var(--primary-color); }
+
+/* ---- List options ---- */
+.list-option {
+    padding: 13px 16px; display: flex; gap: 12px; align-items: center;
+    cursor: pointer; position: relative; transition: background 0.15s;
+}
+.list-option:not(:last-child)::after {
+    content: ""; position: absolute; left: 16px; right: 0; bottom: 0;
+    height: 1px; background: var(--border-color);
+}
+.list-option:active { background: var(--input-bg); }
+
+/* ---- Toast ---- */
+#toast {
+    position: fixed; bottom: calc(var(--nav-total) + 24px); left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: rgba(28, 28, 32, 0.92);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    color: #fff; padding: 11px 22px; border-radius: 999px;
+    font-size: 13px; font-weight: 600;
+    z-index: 5200; opacity: 0; transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none; box-shadow: var(--shadow-float);
+    max-width: 86%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ============================================================
+   コードノート機能用ビュー (オンコミデザインで再構成)
+   ============================================================ */
+
+/* ---- 曲詳細 (コード譜ビューア) ---- */
+#page-detail { display: flex; flex-direction: column; overflow: hidden; }
+.album-header {
+    padding: calc(8px + var(--safe-top)) 15px 8px;
+    background: var(--blur-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--border-color);
+    display: flex; align-items: center; gap: 12px; flex-shrink: 0; min-height: 58px;
+}
+.back-btn {
+    background: var(--input-bg); border: none; color: var(--primary-color);
+    cursor: pointer; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: transform 0.1s ease;
+}
+.back-btn:active { transform: scale(0.9); }
+.back-btn .svg-icon { width: 20px; height: 20px; }
+.album-title-area { min-width: 0; flex: 1; }
+.album-title-area h2 { font-size: 16px; margin: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.album-title-area p { font-size: 12px; margin: 2px 0 0; color: var(--sub-text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-tools { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.round-tool-btn {
+    background: var(--input-bg); border: none; color: var(--primary-color);
+    width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s ease;
+}
+.round-tool-btn:active { transform: scale(0.9); }
+.round-tool-btn .svg-icon { width: 18px; height: 18px; }
+.round-tool-btn.on { background: var(--primary-color); color: #fff; }
+.detail-chip-row {
+    display: flex; gap: 8px; padding: 10px 15px;
+    background: var(--bg-color); border-bottom: 1px solid var(--border-color);
+    overflow-x: auto; scrollbar-width: none; flex-shrink: 0;
+}
+.detail-chip-row::-webkit-scrollbar { display: none; }
+#detail-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; }
+#zoom-container { transform-origin: 0 0; transform: scale(1); width: 100%; will-change: transform, width; }
+#score-output {
+    white-space: pre-wrap; font-size: 16px; color: var(--text-color); font-weight: 400;
+    overflow-x: hidden; padding: 20px 16px 160px; user-select: text;
+}
+.score-artist-line {
+    font-size: 12px; color: var(--sub-text-color); font-weight: 600; letter-spacing: 0.03em;
+    margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);
+}
+.meta-block { display: block; margin-bottom: 8px; font-size: 13px; color: var(--sub-text-color); font-weight: 400; }
+.meta-comment {
+    display: inline-block; padding: 4px 10px;
+    background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+    border-left: 3px solid var(--primary-color); border-radius: 0 6px 6px 0;
+    color: var(--text-color);
+}
+.score-row { display: flex; flex-wrap: wrap; align-items: flex-end; margin: 0 0 20px; min-height: 1.6em; }
+.score-line-normal { margin-bottom: 12px; line-height: 1.7; white-space: pre-wrap; }
+.chord-segment { display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; flex: 0 0 auto; vertical-align: bottom; }
+.segment-chord { margin-bottom: 4px; display: block; }
+.segment-text { line-height: 1.5; min-height: 1.5em; white-space: pre; }
+.chord-name {
+    display: inline-block; color: var(--primary-color); font-weight: 700; font-size: 15px;
+    line-height: 1.25; padding: 2px 8px 2px 3px; margin: 0 0 1px -3px;
+    border-radius: 5px; cursor: pointer; white-space: nowrap; touch-action: manipulation;
+}
+.chord-name:active, .chord-name.playing { background: color-mix(in srgb, var(--primary-color) 22%, transparent); }
+.chord-name.nc { color: var(--sub-text-color); font-weight: 400; cursor: default; }
+.chord-diagram {
+    width: 58px; height: 52px; background: var(--card-bg);
+    border-radius: 5px; border: 1px solid var(--border-color);
+}
+.nns-text-container { line-height: 1.2; white-space: nowrap; margin-bottom: 4px; font-weight: 700; }
+.cn-root { font-size: 1.4rem; color: var(--primary-color); }
+.cn-qual { font-size: 0.85rem; vertical-align: super; margin-left: 1px; color: var(--primary-color); }
+.cn-slash { font-size: 1.1rem; margin: 0 2px; color: var(--folder-color); }
+.cn-bass { font-size: 1.4rem; color: var(--folder-color); }
+.seg-nc-diag {
+    height: 52px; min-width: 10px; display: flex; align-items: flex-end; justify-content: center;
+    color: var(--sub-text-color); padding-bottom: 4px; font-weight: 400;
+}
+@media (max-width: 380px) { .chord-name { font-size: 14px; } .chord-diagram { width: 54px; height: 50px; } }
+
+/* ---- コードポップアップ ---- */
+.chord-popup {
+    position: fixed; right: 14px;
+    bottom: calc(var(--nav-total) + 16px);
+    background: var(--card-bg); border: 1px solid var(--border-color);
+    border-radius: 16px; box-shadow: var(--shadow-float); padding: 12px 14px;
+    z-index: 1400; transform: translateY(20px); opacity: 0; visibility: hidden;
+    pointer-events: none; transition: 0.2s;
+}
+.chord-popup.show { transform: translateY(0); opacity: 1; visibility: visible; pointer-events: auto; }
+.chord-popup .chord-diagram { width: 156px; height: 137px; border: none; background: transparent; }
+.chord-popup-close {
+    position: absolute; top: -10px; right: -10px; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--input-bg); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    color: var(--text-color); border: 1px solid var(--border-color);
+    display: flex; align-items: center; justify-content: center; font-size: 15px; cursor: pointer;
+    box-shadow: var(--shadow-card);
+}
+
+/* ---- ズーム / オートスクロールパネル (sticky-player風) ---- */
+.tool-panel {
+    position: fixed; left: 0; width: 100%; z-index: 1300;
+    bottom: var(--nav-total);
+    background: var(--blur-bg);
+    -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid var(--border-color);
+    border-radius: 18px 18px 0 0;
+    padding: 14px 20px 14px;
+    display: none; align-items: center; gap: 12px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+.tool-panel.show { display: flex; animation: sheet-up 0.25s cubic-bezier(0.32, 0.72, 0.33, 1); }
+.panel-label { font-size: 11px; font-weight: 700; color: var(--sub-text-color); letter-spacing: 0.4px; flex-shrink: 0; }
+.panel-value { font-size: 12px; font-weight: 700; color: var(--text-color); min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.range-slider {
+    flex: 1; height: 5px; -webkit-appearance: none; appearance: none;
+    background: linear-gradient(to right, var(--primary-color) var(--p, 50%), var(--input-bg) var(--p, 50%));
+    border-radius: 3px; outline: none; cursor: pointer;
+}
+.range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; cursor: pointer; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+}
+.range-slider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: none; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3); }
+.play-btn {
+    width: 46px; height: 46px; background: var(--primary-color); color: #fff;
+    border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--primary-color) 45%, transparent);
+    transition: transform 0.12s ease;
+}
+.play-btn:active { transform: scale(0.92); }
+.play-btn.stop { background: var(--danger-color); box-shadow: 0 4px 14px rgba(255, 69, 58, 0.4); }
+.ctrl-close-btn { background: none; border: none; color: var(--sub-text-color); cursor: pointer; padding: 8px; display: flex; flex-shrink: 0; }
+
+/* ---- 編集 ---- */
+#page-edit { display: flex; flex-direction: column; overflow: hidden; }
+.editor-help {
+    font-size: 12px; color: var(--sub-text-color); line-height: 1.6;
+    padding: 10px 16px; background: var(--card-bg); border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+.notepad-area {
+    flex: 1; width: 100%; border: none; outline: none; resize: none;
+    background: var(--bg-color); color: var(--text-color);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px; line-height: 1.8; padding: 16px 16px calc(20px + var(--safe-bottom));
+    user-select: text; -webkit-user-select: text;
+}
+.header-text-btn {
+    background: none; border: none; color: var(--primary-color);
+    font-size: 16px; font-weight: 700; cursor: pointer; padding: 6px 4px; flex-shrink: 0;
+}
+.header-text-btn:active { opacity: 0.6; }
+
+/* ---- チューナー ---- */
+.tuner-card {
+    text-align: center; padding: 34px 26px; background: var(--card-bg);
+    border-radius: var(--radius-card); box-shadow: var(--shadow-card);
+}
+.tuner-eyebrow { font-weight: 700; color: var(--sub-text-color); font-size: 12px; letter-spacing: 1.5px; margin-bottom: 16px; }
+.tuner-note { font-size: 76px; font-weight: 800; line-height: 1; margin: 10px 0; letter-spacing: -1px; color: var(--text-color); }
+.tuner-freq { color: var(--sub-text-color); margin-bottom: 24px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.meter-container {
+    position: relative; height: 10px; background: var(--input-bg);
+    border-radius: 5px; margin: 0 6px 30px; overflow: visible;
+}
+.center-marker { position: absolute; left: 50%; top: -5px; width: 2px; height: 20px; background: var(--sub-text-color); transform: translateX(-50%); border-radius: 1px; }
+.needle {
+    position: absolute; top: -8px; left: 50%; width: 5px; height: 26px;
+    background: var(--primary-color); border-radius: 3px; transform: translateX(-50%);
+    transition: left 0.08s linear; box-shadow: 0 0 10px color-mix(in srgb, var(--primary-color) 60%, transparent);
+}
+.tuner-toggle {
+    background: var(--input-bg); color: var(--text-color); border: none;
+    padding: 12px 34px; border-radius: 22px; font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: transform 0.1s ease;
+}
+.tuner-toggle:active { transform: scale(0.95); }
+.tuner-toggle.on { background: var(--danger-color); color: #fff; }
+
+/* ---- 曲ピッカー ---- */
+.picker-item { padding: 13px 16px; display: flex; gap: 12px; align-items: center; cursor: pointer; position: relative; border-radius: 10px; }
+.picker-item:active { background: var(--input-bg); }
+.picker-item .picker-check { color: var(--input-bg); font-weight: 800; font-size: 18px; width: 24px; flex-shrink: 0; text-align: center; }
+.picker-item.selected .picker-check { color: var(--primary-color); }
+.picker-item.already { opacity: 0.4; pointer-events: none; }
+.picker-title { font-weight: 600; font-size: 15px; }
+.picker-artist { font-size: 12px; color: var(--sub-text-color); margin-top: 1px; }
+
+.hidden-file-input { display: none; }
+#song-list-container { padding: 4px 0 120px; }
+#playlist-song-container { padding: 12px 0 120px; }
+
+@media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+</style>
 </head>
 <body>
-<header class="app-header" id="app-header">
-  <div class="header-left">
-    <span class="material-icons back-btn" id="selection-cancel-btn" onclick="handleCancelAction()" style="display:none">close</span>
-    <span class="material-icons back-btn" id="header-back-btn" onclick="handleBack()" style="display:none">arrow_back_ios</span>
-    <span class="header-title" id="header-title">コードノート</span>
-  </div>
-  <div class="header-right">
-    <div class="icon-btn" id="selection-delete-btn" onclick="handleDeleteAction()" style="display:none;color:var(--danger)"><span class="material-icons">delete</span></div>
-    <div id="normal-header-actions" style="display:flex;align-items:center;gap:2px">
-      <div class="icon-btn" id="header-scroll-btn" onclick="toggleScrollPanel()" style="display:none;color:var(--primary)"><span class="material-icons">arrow_downward</span></div>
-      <div class="header-chip" id="header-key-chip" onclick="openSettingsSheet()" style="display:none"><span class="material-icons" style="font-size:1rem;margin-right:4px">music_note</span><span id="header-key-text">Key: C</span></div>
-      <div class="header-chip" id="header-capo-chip" onclick="openSettingsSheet()" style="display:none"><span id="header-capo-text">Capo: 0</span></div>
-      <div class="icon-btn" id="header-playlist-btn" onclick="togglePlaylistModal(true)" style="color:#e91e63"><span class="material-icons">favorite</span></div>
-      <div class="icon-btn" id="header-zoom-btn" onclick="toggleZoomPanel()" style="display:none"><span class="material-icons">zoom_in</span></div>
-      <div class="icon-btn" id="header-edit-btn" onclick="enterEditMode()" style="display:none"><span class="material-icons">edit</span></div>
+
+<div id="toast"></div>
+
+<!-- ========== iOS アラート (confirm / prompt) ========== -->
+<div class="alert-overlay" id="ios-alert-overlay">
+    <div class="ios-alert">
+        <div class="ios-alert-body">
+            <div class="ios-alert-title" id="ios-alert-title"></div>
+            <div class="ios-alert-msg" id="ios-alert-msg" style="display:none;"></div>
+            <input type="text" class="ios-alert-input" id="ios-alert-input" style="display:none;">
+        </div>
+        <div class="ios-alert-actions">
+            <button class="ios-alert-btn" id="ios-alert-cancel">キャンセル</button>
+            <button class="ios-alert-btn confirm" id="ios-alert-ok">OK</button>
+        </div>
     </div>
-  </div>
-</header>
-<div id="zoom-control-panel" class="zoom-control-panel">
-  <div class="icon-btn" onclick="zoomOut()"><span class="material-icons">remove</span></div>
-  <input type="range" class="scroll-slider" id="zoom-slider" min="50" max="300" value="100" oninput="updateZoomFromSlider()" style="flex:1">
-  <div class="icon-btn" onclick="zoomIn()"><span class="material-icons">add</span></div>
-  <span id="zoom-val-text" style="font-size:.9rem;width:44px;text-align:right">100%</span>
-  <div class="icon-btn" onclick="closeZoomPanel()" style="color:var(--danger)"><span class="material-icons">close</span></div>
 </div>
-<main id="main-content">
-  <section id="tab-view" class="tab-section active">
-    <div id="view-list">
-      <div class="search-container"><div class="search-box"><span class="material-icons" style="color:#999">search</span><input type="search" class="search-input" id="song-search" placeholder="曲名・アーティスト名" oninput="filterSongs()"></div></div>
-      <div id="song-list-container"></div>
-      <div class="fab" id="fab-add" onclick="createNewSong()"><span class="material-icons">add</span></div>
+
+<!-- ========== アクションシート ========== -->
+<div class="action-sheet-overlay" id="action-sheet-overlay">
+    <div class="action-sheet" id="action-sheet-inner">
+        <div class="action-sheet-group" id="action-sheet-group"></div>
+        <div class="action-sheet-group">
+            <button class="action-sheet-btn action-sheet-cancel" id="action-sheet-cancel">キャンセル</button>
+        </div>
     </div>
-    <div id="view-detail" class="detail-view"><div id="zoom-container"><div id="score-output"></div></div></div>
-  </section>
-  <div id="scroll-panel" class="scroll-panel">
-    <button class="scroll-btn-circle" id="scroll-play-btn" onclick="toggleAutoScroll()"><span class="material-icons">play_arrow</span></button>
-    <div class="scroll-slider-container"><div class="scroll-speed-label">Speed</div><input type="range" class="scroll-slider" id="scroll-speed" min="1" max="50" value="10"></div>
-    <div class="icon-btn" onclick="closeScrollPanel()" style="color:#aaa"><span class="material-icons">close</span></div>
-  </div>
-  <section id="tab-edit" class="tab-section">
-    <div class="editor-container"><div class="editor-help">{title:曲名} {artist:歌手名} {key:C} で情報を指定<br>[C]のようにコードを記述</div><textarea id="edit-source" class="notepad-area" placeholder="{title: 曲名}&#10;{artist: アーティスト}&#10;{key: C}&#10;&#10;[Am7]歌詞..."></textarea></div>
-    <div class="fab" onclick="saveCurrentSong()"><span class="material-icons">check</span></div>
-  </section>
-  <section id="tab-tuner" class="tab-section"><div class="tuner-card"><div style="font-weight:bold;color:#78909c;margin-bottom:16px">CHROMATIC TUNER</div><div style="font-size:5rem;font-weight:bold;line-height:1;margin:10px 0" id="tuner-note">--</div><div style="color:#aaa;margin-bottom:20px"><span id="tuner-freq">0</span> Hz</div><div class="meter-container"><div class="center-marker"></div><div class="needle" id="tuner-needle"></div></div><button id="tuner-toggle-btn" onclick="toggleTuner()" style="background:rgba(255,255,255,.2);color:white;padding:10px 30px;border-radius:20px;font-size:1rem;cursor:pointer">開始</button></div></section>
-  <section id="tab-settings" class="tab-section">
-    <div class="settings-section-title">表記設定</div><div class="segment-control"><div class="segment-option selected" id="opt-sharp" onclick="setNotation('sharp')"># Sharp</div><div class="segment-option" id="opt-flat" onclick="setNotation('flat')">♭ Flat</div></div>
-    <div class="settings-section-title">ギターチューニング</div><div class="settings-list" id="tuning-list"><div class="settings-item" data-tuning="std" onclick="setTuning('std')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Standard</div><div class="settings-desc">E A D G B E</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="dropd" onclick="setTuning('dropd')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Drop D</div><div class="settings-desc">D A D G B E</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="half" onclick="setTuning('half')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">半音下げ</div><div class="settings-desc">E♭ A♭ D♭ G♭ B♭ E♭</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="dropcs" onclick="setTuning('dropcs')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Drop C#</div><div class="settings-desc">C# G# C# F# A# D#</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="whole" onclick="setTuning('whole')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">全音下げ</div><div class="settings-desc">D G C F A D</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="dropc" onclick="setTuning('dropc')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Drop C</div><div class="settings-desc">C G C F A D</div></div><span class="material-icons settings-arrow tuning-check">check</span></div><div class="settings-item" data-tuning="dropb" onclick="setTuning('dropb')"><span class="material-icons settings-icon">music_note</span><div class="settings-content"><div class="settings-title">Drop B</div><div class="settings-desc">B F# B E G# C#</div></div><span class="material-icons settings-arrow tuning-check">check</span></div></div><div class="settings-section-title">データ管理</div><div class="settings-list"><div class="settings-item" onclick="exportData()"><span class="material-icons settings-icon">download</span><div class="settings-content"><div class="settings-title">ファイルに保存</div><div class="settings-desc">ライブラリをJSONファイルとして保存</div></div><span class="material-icons settings-arrow">chevron_right</span></div><div class="settings-item" onclick="document.getElementById('import-file').click()"><span class="material-icons settings-icon">upload</span><div class="settings-content"><div class="settings-title">ファイルから読込</div><div class="settings-desc">JSONファイルを読み込んで追加</div></div><span class="material-icons settings-arrow">chevron_right</span></div><input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importData(this)"><div class="settings-item" onclick="resetAllData()"><span class="material-icons settings-icon" style="color:var(--danger)">delete_forever</span><div class="settings-content"><div class="settings-title" style="color:var(--danger)">全データ削除</div><div class="settings-desc">曲・プレイリスト・設定をすべて消去</div></div><span class="material-icons settings-arrow">chevron_right</span></div></div>
-    <div class="settings-section-title">アプリ情報</div><div class="settings-list"><div class="settings-item"><span class="material-icons settings-icon">info</span><div class="settings-content"><div class="settings-title">コードノート</div><div class="settings-desc">v1.0.0 / MIT License</div></div></div><div class="settings-item" onclick="window.open('https://github.com/SakiikaVR/chord-note','_blank')"><span class="material-icons settings-icon">code</span><div class="settings-content"><div class="settings-title">ソースコード</div><div class="settings-desc">GitHub で公開しています</div></div><span class="material-icons settings-arrow">open_in_new</span></div></div>
-  </section>
-</main>
-<footer class="app-footer" id="app-footer"><nav class="bottom-nav"><div class="nav-item active" onclick="switchMainTab('view',this)"><span class="material-icons">library_music</span><span>コード譜</span></div><div class="nav-item" onclick="switchMainTab('tuner',this)"><span class="material-icons">graphic_eq</span><span>チューナー</span></div><div class="nav-item" onclick="switchMainTab('settings',this)"><span class="material-icons">settings</span><span>設定</span></div></nav></footer>
-<div class="modal-overlay" id="playlist-modal"><div class="modal-card" style="height:72dvh"><div class="playlist-header"><div style="display:flex;align-items:center;min-width:0"><span class="material-icons icon-btn" id="pl-back-btn" style="display:none" onclick="history.back()">arrow_back_ios</span><span style="font-weight:bold;font-size:1.08rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="pl-title">プレイリスト</span></div><div style="display:flex"><div class="icon-btn" id="pl-delete-btn" style="display:none;color:var(--danger)" onclick="deleteSelectedPlaylists()"><span class="material-icons">delete</span></div><span class="material-icons icon-btn" id="pl-close-btn" onclick="closePlaylistModalCompletely()">close</span><span class="material-icons icon-btn" id="pl-selection-cancel" style="display:none" onclick="exitPlaylistSelectionMode()">close</span></div></div><div class="modal-body"><div id="playlist-index-view"><div id="playlist-list-container"></div></div><div id="playlist-detail-view" style="display:none"><div id="playlist-songs-container"></div></div></div><div class="modal-footer" id="playlist-footer-actions"></div></div></div>
-<div class="modal-overlay" id="song-picker-modal" style="z-index:160"><div class="modal-card"><div class="modal-header"><span>曲を選択</span><span class="material-icons icon-btn" onclick="closeSongPicker()">close</span></div><div class="modal-body" id="picker-list"></div><div class="modal-footer"><button class="primary-btn" onclick="addSongsToPlaylist()">追加</button></div></div></div>
-<div class="bottom-sheet-overlay" id="sheet-overlay" onclick="closeAllSheets()"></div>
-<div class="bottom-sheet" id="settings-sheet"><div class="sheet-title">表示設定 & Key & Capo</div><div class="radio-group"><div class="radio-item selected" onclick="setMode('text',this)" id="mode-text-btn"><div class="radio-left"><span class="material-icons">text_fields</span><span>コード名（タップで押さえ方）</span></div></div><div class="radio-item" onclick="setMode('power',this)" id="mode-power-btn"><div class="radio-left"><span class="material-icons">bolt</span><span>Power Chord (5th)</span></div></div><div class="radio-item" onclick="setMode('nns',this)" id="mode-nns-btn"><div class="radio-item-content"><div class="radio-left"><span class="material-icons">looks_one</span><span>NNS (度数)</span></div><select id="compact-key-picker" class="compact-key-select" onclick="event.stopPropagation()" onchange="changeKeyFromCompact(this)"></select></div></div><div class="radio-item"><div class="radio-item-content"><div class="radio-left"><span class="material-icons">tune</span><span>Capo</span></div><select id="compact-capo-picker" class="compact-key-select" onclick="event.stopPropagation()" onchange="changeCapo(this)"></select></div></div><div class="radio-item" onclick="toggleDiag()" id="diag-toggle-btn"><div class="radio-item-content"><div class="radio-left"><span class="material-icons">grid_on</span><span>ダイアグラムを常に表示</span></div><span class="material-icons" id="diag-check" style="color:var(--primary);opacity:0">check</span></div></div></div><button class="sheet-close-btn" onclick="closeAllSheets()">閉じる</button></div>
-<div id="chord-popup" class="chord-popup"><span class="material-icons chord-popup-close" onclick="closeChordPopup()">close</span><div id="chord-popup-body"></div></div>
-<div id="toast" class="toast"></div>
-<script src="js/app.js"></script>
+</div>
+
+<!-- ========== 選択バー ========== -->
+<div id="selection-bar">
+    <button class="action-btn" id="sel-cancel-btn">
+        <svg viewBox="0 0 24 24" class="svg-icon"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        キャンセル
+    </button>
+    <button class="action-btn" id="sel-all-btn">
+        <svg viewBox="0 0 24 24" class="svg-icon"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        全選択
+    </button>
+    <button class="action-btn delete" id="sel-delete-btn">
+        <svg viewBox="0 0 24 24" class="svg-icon"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        <span id="sel-delete-label">削除</span>
+    </button>
+</div>
+
+<!-- ========== ライブラリ (コード譜一覧) ========== -->
+<div id="page-library" class="page active">
+    <div class="sticky-header">
+        <h1>
+            <span>コードノート</span>
+            <button class="icon-btn" id="add-song-btn" aria-label="新規作成">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+        </h1>
+        <div class="search-container">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="search" id="song-search" class="search-input" placeholder="曲名・アーティスト名で検索">
+        </div>
+    </div>
+    <div id="song-list-container"></div>
+</div>
+
+<!-- ========== チューナー ========== -->
+<div id="page-tuner" class="page">
+    <div class="content-padding">
+        <div class="settings-header"><h1>チューナー</h1></div>
+        <div class="tuner-card">
+            <div class="tuner-eyebrow">CHROMATIC TUNER</div>
+            <div class="tuner-note" id="tuner-note">--</div>
+            <div class="tuner-freq"><span id="tuner-freq">0</span> Hz</div>
+            <div class="meter-container">
+                <div class="center-marker"></div>
+                <div class="needle" id="tuner-needle"></div>
+            </div>
+            <button id="tuner-toggle-btn" class="tuner-toggle">開始</button>
+        </div>
+        <div class="settings-group" style="margin-top:26px;">
+            <h3>ヒント</h3>
+            <div class="settings-card">
+                <div class="settings-row" style="cursor:default;">
+                    <div class="settings-label" style="font-size:13px; color:var(--sub-text-color); line-height:1.6;">マイク入力から自己相関法でピッチを検出します。針が中央に来るように合わせてください。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== プレイリスト ========== -->
+<div id="page-lists" class="page">
+    <div class="sticky-header">
+        <h1>
+            <span style="display:flex; align-items:center; gap:4px; min-width:0; flex:1;">
+                <button class="icon-btn" id="pl-back-btn" style="display:none;">
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <span id="pl-header-title" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">プレイリスト</span>
+            </span>
+            <button class="icon-btn" id="pl-add-btn" aria-label="新規作成">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+            <button class="icon-btn" id="pl-addsong-btn" style="display:none;" aria-label="曲を追加">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle><line x1="3" y1="5" x2="3" y2="11" style="display:none;"></line></svg>
+            </button>
+        </h1>
+    </div>
+    <div id="playlist-collection" class="list-collection"></div>
+    <div id="playlist-song-container" style="display:none;"></div>
+</div>
+
+<!-- ========== 設定 ========== -->
+<div id="page-settings" class="page">
+    <div class="content-padding">
+        <div class="settings-header"><h1>設定</h1></div>
+
+        <div class="storage-container">
+            <div class="storage-info" id="song-count-info">0</div>
+            <div class="storage-sub">保存されている曲</div>
+        </div>
+
+        <div class="settings-group">
+            <h3>表記設定</h3>
+            <div class="settings-card">
+                <div class="settings-row" id="notation-sharp-row">
+                    <div class="settings-label"># シャープ表記</div>
+                    <div class="settings-check">✓</div>
+                </div>
+                <div class="settings-row" id="notation-flat-row">
+                    <div class="settings-label">♭ フラット表記</div>
+                    <div class="settings-check">✓</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <h3>表示設定</h3>
+            <div class="settings-card">
+                <div class="settings-row" id="theme-row">
+                    <div class="settings-label">テーマ</div>
+                    <div class="settings-value-display" id="theme-value">ダーク</div>
+                    <div class="settings-chevron">›</div>
+                </div>
+                <div class="settings-row" id="accent-row">
+                    <div class="settings-label">アクセントカラー</div>
+                    <div class="settings-value-display" id="accent-value">ブルー</div>
+                    <div class="settings-chevron">›</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <h3>ギターチューニング</h3>
+            <div class="settings-card" id="tuning-list"></div>
+        </div>
+
+        <div class="settings-group">
+            <h3>データ管理</h3>
+            <div class="settings-card">
+                <div class="settings-row" id="export-row">
+                    <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></div>
+                    <div class="settings-label">ファイルに保存<div class="settings-sub">ライブラリをJSONファイルとして保存</div></div>
+                    <div class="settings-chevron">›</div>
+                </div>
+                <div class="settings-row" id="import-row">
+                    <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg></div>
+                    <div class="settings-label">ファイルから読込<div class="settings-sub">JSONファイルを読み込んで追加</div></div>
+                    <div class="settings-chevron">›</div>
+                </div>
+                <div class="settings-row" id="reset-row">
+                    <div class="settings-icon" style="color:var(--danger-color);"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></div>
+                    <div class="settings-label" style="color:var(--danger-color);">全データ削除<div class="settings-sub">曲・プレイリスト・設定をすべて消去</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <h3>アプリ情報</h3>
+            <div class="settings-card">
+                <div class="settings-row" style="cursor:default;">
+                    <div class="settings-label">コードノート<div class="settings-sub">v1.0.0 / MIT License — デザイン: オンコミ</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<input type="file" id="import-file" class="hidden-file-input" accept=".json,application/json">
+
+<!-- ========== 曲詳細 (コード譜ビューア) ========== -->
+<div id="page-detail" class="page">
+    <div class="album-header">
+        <button class="back-btn" id="detail-back-btn">
+            <svg viewBox="0 0 24 24" class="svg-icon"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <div class="album-title-area">
+            <h2 id="detail-title">曲名</h2>
+            <p id="detail-artist">アーティスト</p>
+        </div>
+        <div class="header-tools">
+            <button class="round-tool-btn" id="scroll-btn" aria-label="オートスクロール">
+                <svg viewBox="0 0 24 24" class="svg-icon"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+            </button>
+            <button class="round-tool-btn" id="zoom-btn" aria-label="ズーム">
+                <svg viewBox="0 0 24 24" class="svg-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+            </button>
+            <button class="round-tool-btn" id="edit-btn" aria-label="編集">
+                <svg viewBox="0 0 24 24" class="svg-icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+        </div>
+    </div>
+    <div class="detail-chip-row">
+        <button class="filter-chip" id="key-chip">
+            <svg viewBox="0 0 24 24" class="svg-icon" style="width:14px;height:14px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+            <span id="key-chip-text">Key: C</span>
+        </button>
+        <button class="filter-chip" id="capo-chip"><span id="capo-chip-text">Capo: 0</span></button>
+        <button class="filter-chip" id="mode-chip"><span id="mode-chip-text">コード名</span></button>
+    </div>
+    <div id="detail-scroll">
+        <div id="zoom-container"><div id="score-output"></div></div>
+    </div>
+</div>
+
+<!-- ズームパネル -->
+<div class="tool-panel" id="zoom-panel">
+    <span class="panel-label">ZOOM</span>
+    <input type="range" class="range-slider" id="zoom-slider" min="50" max="300" value="100">
+    <span class="panel-value" id="zoom-val-text">100%</span>
+    <button class="ctrl-close-btn" id="zoom-close-btn"><svg viewBox="0 0 24 24" class="svg-icon" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+</div>
+
+<!-- オートスクロールパネル -->
+<div class="tool-panel" id="scroll-panel">
+    <button class="play-btn" id="scroll-play-btn">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    </button>
+    <span class="panel-label">SPEED</span>
+    <input type="range" class="range-slider" id="scroll-speed" min="1" max="50" value="10">
+    <button class="ctrl-close-btn" id="scroll-close-btn"><svg viewBox="0 0 24 24" class="svg-icon" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+</div>
+
+<!-- ========== 編集 ========== -->
+<div id="page-edit" class="page full">
+    <div class="album-header">
+        <button class="back-btn" id="edit-back-btn">
+            <svg viewBox="0 0 24 24" class="svg-icon"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <div class="album-title-area"><h2>編集中</h2><p>ChordPro 形式で入力</p></div>
+        <button class="header-text-btn" id="save-btn">保存</button>
+    </div>
+    <div class="editor-help">{title:曲名} {artist:歌手名} {key:C} で情報を指定 / [C] のようにコードを記述 / {c: コメント}</div>
+    <textarea id="edit-source" class="notepad-area" placeholder="{title: 曲名}&#10;{artist: アーティスト}&#10;{key: C}&#10;&#10;[Am7]歌詞..."></textarea>
+</div>
+
+<!-- ========== 表示設定シート (Key / Capo / モード) ========== -->
+<div class="modal-overlay" id="settings-sheet">
+    <div class="modal-content">
+        <div class="modal-header"><span>表示設定 &amp; Key &amp; Capo</span><button id="sheet-close-x">✕</button></div>
+        <div class="modal-body" style="gap:0;">
+            <div class="settings-card" style="box-shadow:none;">
+                <div class="settings-row" data-mode="text">
+                    <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg></div>
+                    <div class="settings-label">コード名<div class="settings-sub">タップで押さえ方を表示</div></div>
+                    <div class="settings-check">✓</div>
+                </div>
+                <div class="settings-row" data-mode="power">
+                    <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div>
+                    <div class="settings-label">Power Chord (5th)</div>
+                    <div class="settings-check">✓</div>
+                </div>
+                <div class="settings-row" data-mode="nns">
+                    <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M10 8l2-1v10"></path></svg></div>
+                    <div class="settings-label">NNS (度数)</div>
+                    <div class="settings-check" style="margin-right:10px;">✓</div>
+                    <select id="compact-key-picker" class="form-input" style="width:110px; padding:8px 10px; font-size:13px;"></select>
+                </div>
+                <div class="settings-row" style="cursor:default;">
+                    <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg></div>
+                    <div class="settings-label">Capo</div>
+                    <select id="compact-capo-picker" class="form-input" style="width:110px; padding:8px 10px; font-size:13px;"></select>
+                </div>
+                <div class="settings-row" id="diag-toggle-row">
+                    <div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg></div>
+                    <div class="settings-label">ダイアグラムを常に表示</div>
+                    <div class="settings-check" id="diag-check">✓</div>
+                </div>
+            </div>
+            <button class="btn-cancel" id="sheet-close-btn" style="margin-top:16px;">閉じる</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 曲ピッカー ========== -->
+<div class="modal-overlay" id="song-picker-modal">
+    <div class="modal-content" style="height: 76vh;">
+        <div class="modal-header"><span>曲を選択</span><button id="picker-close-btn">✕</button></div>
+        <div style="flex:1; overflow-y:auto; margin:0 -6px;" id="picker-list"></div>
+        <div class="modal-actions">
+            <button class="btn-primary" id="picker-add-btn">追加</button>
+        </div>
+    </div>
+</div>
+
+<!-- コードポップアップ -->
+<div id="chord-popup" class="chord-popup">
+    <div class="chord-popup-close" id="chord-popup-close">✕</div>
+    <div id="chord-popup-body"></div>
+</div>
+
+<!-- ========== ボトムナビ ========== -->
+<nav class="bottom-nav" id="bottom-nav">
+    <div class="nav-item active" data-page="library">
+        <svg viewBox="0 0 24 24" class="svg-icon"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+        <span>コード譜</span>
+    </div>
+    <div class="nav-item" data-page="tuner">
+        <svg viewBox="0 0 24 24" class="svg-icon"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        <span>チューナー</span>
+    </div>
+    <div class="nav-item" data-page="lists">
+        <svg viewBox="0 0 24 24" class="svg-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        <span>リスト</span>
+    </div>
+    <div class="nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24" class="svg-icon"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>設定</span>
+    </div>
+</nav>
+
+<script>
+/*!
+ * コードノート (Chord Note) — アプリケーションロジック
+ * Copyright (c) 2026 SakiikaVR / MIT License
+ * デザイン: オンコミ (ON-Comi) / MIT License
+ */
+'use strict';
+
+/* ============ 音楽理論データ ============ */
+const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const NOTES_FLAT=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const MajorDegrees={sharp:['1','1#','2','2#','3','4','4#','5','5#','6','6#','7'],flat:['1','2b','2','3b','3','4','5b','5','6b','6','7b','7']};
+// サンプル曲「ふるさと」: 作詞 高野辰之(1947年没) / 作曲 岡野貞一(1941年没) — パブリックドメイン
+const SAMPLE_SONG={id:'sample_furusato',title:'ふるさと',artist:'文部省唱歌',key:'C',mode:'text',capo:0,content:'{title:ふるさと}\n{artist:文部省唱歌}\n{subtitle:作詞：高野辰之 / 作曲：岡野貞一（パブリックドメイン）}\n{c:3/4拍子 サンプル曲}\n{key:C}\n\n[C]うさぎ[F]おいし[G7]かのや[C]ま\n[C]こぶな[F]つりし[G7]かのか[C]わ\n[F]ゆめは[C]いまも　[G7]めぐり[C]て\n[C]わすれ[F]がた[C]き　[G7]ふるさ[C]と\n\n[C]いかに[F]います[G7]ちちは[C]は\n[C]つつが[F]なしや[G7]ともが[C]き\n[F]あめに[C]かぜに　[G7]つけて[C]も\n[C]おもい[F]いず[C]る　[G7]ふるさ[C]と\n\n[C]こころ[F]ざしを[G7]はたし[C]て\n[C]いつの[F]ひにか[G7]かえら[C]ん\n[F]やまは[C]あおき　[G7]ふるさ[C]と\n[C]みずは[F]きよ[C]き　[G7]ふるさ[C]と'};
+const CHORD_SHAPES={'C':[-1,3,2,0,1,0],'D':[-1,-1,0,2,3,2],'D7':[-1,-1,0,2,1,2],'E':[0,2,2,1,0,0],'E7':[0,2,0,1,0,0],'Em':[0,2,2,0,0,0],'Em7':[0,2,0,0,0,0],'F':[1,3,3,2,1,1],'G':[3,2,0,0,0,3],'G7':[3,2,0,0,0,1],'A':[-1,0,2,2,2,0],'Am':[-1,0,2,2,1,0],'Am7':[-1,0,2,0,1,0],'B':[-1,2,4,4,4,2],'Bm':[-1,2,4,4,3,2],'Bm7':[-1,2,4,2,3,2],'Bb':[-1,1,3,3,3,1],'A#':[-1,1,3,3,3,1],'Bbsus4':[-1,1,3,3,4,1],'Ab':[4,6,6,5,4,4],'G#':[4,6,6,5,4,4],'Abadd9':[4,6,6,5,4,6],'Eb':[-1,6,8,8,8,6],'D#':[-1,6,8,8,8,6],'Ebadd9':[-1,6,8,8,6,6],'Eb/D':[-1,5,8,8,8,6],'Cm':[-1,3,5,5,4,3],'Cm7':[-1,3,5,3,4,3],'Db':[-1,4,6,6,6,4],'C#':[-1,4,6,6,6,4],'Dbadd9':[-1,4,6,6,4,4],'Fm7':[1,3,1,1,1,1],'Gm7':[3,5,3,3,3,3],'F#':[2,4,4,3,2,2],'Gb':[2,4,4,3,2,2],'F#sus4':[2,4,4,4,2,2],'Gbsus4':[2,4,4,4,2,2],'Eb/G':[3,6,5,3,4,3],'Bb/D':[-1,5,3,3,3,-1],'Eb7':[-1,6,8,6,8,6],'D#7':[-1,6,8,6,8,6],'Ab7':[4,6,4,5,4,4],'G#7':[4,6,4,5,4,4]};
+const ENHARMONIC={'A#':'Bb','Bb':'A#','C#':'Db','Db':'C#','D#':'Eb','Eb':'D#','F#':'Gb','Gb':'F#','G#':'Ab','Ab':'G#'};
+const TUNINGS={std:{shift:0,drop:false,label:'Standard',desc:'E A D G B E'},dropd:{shift:0,drop:true,label:'Drop D',desc:'D A D G B E'},half:{shift:1,drop:false,label:'半音下げ',desc:'E♭ A♭ D♭ G♭ B♭ E♭'},dropcs:{shift:1,drop:true,label:'Drop C#',desc:'C# G# C# F# A# D#'},whole:{shift:2,drop:false,label:'全音下げ',desc:'D G C F A D'},dropc:{shift:2,drop:true,label:'Drop C',desc:'C G C F A D'},dropb:{shift:3,drop:true,label:'Drop B',desc:'B F# B E G# C#'}};
+const ACCENTS={blue:{c:'#7bb3d7',label:'ブルー'},pink:{c:'#f79ecd',label:'ピンク'},red:{c:'#ff453a',label:'レッド'},orange:{c:'#ff9f0a',label:'オレンジ'}};
+const THEMES={dark:{label:'ダーク'},light:{label:'ライト'}};
+function diagInk(){return themeId==='light'?'#1c1c1e':'#ffffff'} // ダイアグラム描画色(テーマ連動)
+
+/* ============ 状態 ============ */
+let notationMode=localStorage.getItem('cv_notation')||'sharp';
+let tuningId=localStorage.getItem('cv_tuning')||'std'; if(!TUNINGS[tuningId])tuningId='std';
+let accentId=localStorage.getItem('cv_accent')||'blue'; if(!ACCENTS[accentId])accentId='blue';
+let themeId=localStorage.getItem('cv_theme')||'dark'; if(!THEMES[themeId])themeId='dark';
+let songLibrary=[],playlists=[];
+let currentSongId=null,currentPlaylistId=null;
+let isSelectionMode=false,isPlaylistSelectionMode=false;
+let selectedSongIds=new Set(),selectedPlaylistIds=new Set();
+let longPressTimer=null,suppressNextClick=false;
+let scrollInterval=null,isScrolling=false,zoomLevel=100;
+let audioCtx=null,analyser=null,tunerRaf=null;
+let activePage='library';
+
+const $=id=>document.getElementById(id);
+
+/* ============ ユーティリティ ============ */
+function escapeHTML(str){return String(str??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;')}
+function M_toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),1800)}
+function loadLibrary(){try{songLibrary=JSON.parse(localStorage.getItem('cv_library')||'[]')}catch{songLibrary=[]}}
+function saveLibrary(){localStorage.setItem('cv_library',JSON.stringify(songLibrary))}
+function loadPlaylists(){try{playlists=JSON.parse(localStorage.getItem('cv_playlists')||'[]')}catch{playlists=[]}}
+function savePlaylists(){localStorage.setItem('cv_playlists',JSON.stringify(playlists))}
+function getSong(id){return songLibrary.find(s=>s.id===id)}
+
+/* ---- iOSアラート (confirm / prompt) ---- */
+function iosConfirm(title,msg='',okText='OK',danger=false){
+    return new Promise(resolve=>{
+        $('ios-alert-title').textContent=title;
+        const m=$('ios-alert-msg');m.textContent=msg;m.style.display=msg?'block':'none';
+        $('ios-alert-input').style.display='none';
+        const ok=$('ios-alert-ok');ok.textContent=okText;ok.classList.toggle('danger',danger);
+        $('ios-alert-overlay').classList.add('show');
+        const done=v=>{$('ios-alert-overlay').classList.remove('show');ok.onclick=null;$('ios-alert-cancel').onclick=null;resolve(v)};
+        ok.onclick=()=>done(true);
+        $('ios-alert-cancel').onclick=()=>done(false);
+    });
+}
+function iosPrompt(title,initial=''){
+    return new Promise(resolve=>{
+        $('ios-alert-title').textContent=title;
+        $('ios-alert-msg').style.display='none';
+        const inp=$('ios-alert-input');inp.style.display='block';inp.value=initial;
+        const ok=$('ios-alert-ok');ok.textContent='OK';ok.classList.remove('danger');
+        $('ios-alert-overlay').classList.add('show');
+        setTimeout(()=>inp.focus(),80);
+        const done=v=>{$('ios-alert-overlay').classList.remove('show');ok.onclick=null;$('ios-alert-cancel').onclick=null;inp.onkeyup=null;resolve(v)};
+        ok.onclick=()=>done(inp.value);
+        inp.onkeyup=e=>{if(e.key==='Enter')done(inp.value)};
+        $('ios-alert-cancel').onclick=()=>done(null);
+    });
+}
+/* ---- アクションシート ---- */
+function actionSheet(title,actions){
+    return new Promise(resolve=>{
+        const g=$('action-sheet-group');g.innerHTML='';
+        if(title){const t=document.createElement('div');t.className='action-sheet-title';t.textContent=title;g.appendChild(t)}
+        actions.forEach((a,i)=>{
+            const b=document.createElement('button');
+            b.className='action-sheet-btn'+(a.danger?' danger':'')+(a.active?' active':'');
+            b.innerHTML=`<span>${escapeHTML(a.label)}</span>`+(a.active?'<span class="sheet-check">✓</span>':'');
+            b.onclick=()=>done(i);
+            g.appendChild(b);
+        });
+        $('action-sheet-overlay').classList.add('show');
+        const done=v=>{$('action-sheet-overlay').classList.remove('show');$('action-sheet-cancel').onclick=null;$('action-sheet-overlay').onclick=null;resolve(v)};
+        $('action-sheet-cancel').onclick=()=>done(-1);
+        $('action-sheet-overlay').onclick=e=>{if(e.target===$('action-sheet-overlay'))done(-1)};
+    });
+}
+
+/* ============ ページ切り替え ============ */
+function showPage(id){
+    activePage=id;
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    $('page-'+id).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page===(id==='detail'?'library':id)));
+    document.body.classList.toggle('hide-nav',id==='edit');
+    if(id!=='detail'){closeChordPopup();closeScrollPanel();closeZoomPanel()}
+}
+document.querySelectorAll('.nav-item').forEach(n=>{
+    n.addEventListener('click',()=>{
+        const target=n.dataset.page;
+        if($('page-edit').classList.contains('active'))return;
+        if(target==='library'&&currentSongId&&activePage==='detail'){history.back();return}
+        if(activePage==='detail'&&target!=='library'){/* 曲を開いたまま他タブへ */}
+        showPage(target);
+    });
+});
+
+/* ============ 履歴管理 ============ */
+window.addEventListener('popstate',e=>restoreState(e.state));
+function restoreState(state){
+    if($('page-edit').classList.contains('active')){/* 編集破棄で戻る */}
+    if(isSelectionMode)exitSelectionMode();
+    if(isPlaylistSelectionMode)exitPlaylistSelectionMode();
+    closeSongPicker();
+    if(!state||!state.mode){_closeSongDetailView();_closePlaylistDetail();return}
+    if(state.mode==='song'){_closePlaylistDetail();openSongDetail(state.songId,false);return}
+    if(state.mode==='playlist_detail'){_closeSongDetailView();_openPlaylistDetailInternal(state.playlistId);showPage('lists');return}
+    if(state.mode==='edit'){enterEditModeInternal();return}
+}
+
+/* ============ 五十音インデックス ============ */
+function getIndexChar(str){if(!str)return'#';const c=str.charAt(0);if(/[ぁ-んァ-ン]/.test(c)){const h=c.replace(/[ァ-ン]/g,s=>String.fromCharCode(s.charCodeAt(0)-0x60));if(/[あ-お]/.test(h))return'あ';if(/[か-ご]/.test(h))return'か';if(/[さ-ぞ]/.test(h))return'さ';if(/[た-ど]/.test(h))return'た';if(/[な-の]/.test(h))return'な';if(/[は-ぽ]/.test(h))return'は';if(/[ま-も]/.test(h))return'ま';if(/[や-よ]/.test(h))return'や';if(/[ら-ろ]/.test(h))return'ら';if(/[わ-ん]/.test(h))return'わ';return'他'}if(/[a-zA-Z]/.test(c))return c.toUpperCase();return'#'}
+function getIndexColorClass(c){return {'あ':'idx-a','か':'idx-k','さ':'idx-s','た':'idx-t','な':'idx-n','は':'idx-h','ま':'idx-m','や':'idx-y','ら':'idx-r','わ':'idx-w'}[c]||(/[A-Z]/.test(c)?'idx-en':'idx-def')}
+
+/* ============ 曲リスト ============ */
+function renderSongList(filter=''){
+    const c=$('song-list-container');c.innerHTML='';
+    const f=filter.toLowerCase();
+    const arr=songLibrary.filter(s=>[s.title,s.artist,s.content].some(v=>String(v||'').toLowerCase().includes(f))).sort((a,b)=>String(a.title||'').localeCompare(String(b.title||''),'ja'));
+    if(!arr.length){
+        c.innerHTML=`<div class="empty-library">
+            <svg viewBox="0 0 24 24" class="svg-icon"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+            <p>${songLibrary.length?'該当する曲がありません':'ライブラリは空です'}</p>
+            <span>${songLibrary.length?'検索条件を変えてみてください':'右上の「＋」から新しいコード譜を作成できます'}</span>
+        </div>`;
+        return;
+    }
+    let group=null,card=null;
+    arr.forEach(s=>{
+        const idx=getIndexChar(s.title);
+        if(idx!==group){
+            group=idx;
+            if(card)c.appendChild(card);
+            const h=document.createElement('div');h.className='index-header';h.textContent=idx;c.appendChild(h);
+            card=document.createElement('div');card.className='song-group';
+        }
+        const li=document.createElement('div');
+        li.className='song-item'+(selectedSongIds.has(s.id)?' selected':'');
+        li.addEventListener('touchstart',()=>startLongPress(s.id),{passive:true});
+        li.addEventListener('touchend',cancelLongPress,{passive:true});
+        li.addEventListener('touchmove',cancelLongPress,{passive:true});
+        li.addEventListener('mousedown',()=>startLongPress(s.id));
+        li.addEventListener('mouseup',cancelLongPress);
+        li.addEventListener('mouseleave',cancelLongPress);
+        li.addEventListener('contextmenu',e=>{e.preventDefault();if(!isSelectionMode)enterSelectionMode(s.id)});
+        li.onclick=()=>handleItemClick(s.id);
+        const icon=escapeHTML((s.title||'?').charAt(0));
+        const right=isSelectionMode
+            ?(selectedSongIds.has(s.id)?'<div class="song-check">✓</div>':'<div style="width:24px;"></div>')
+            :'<div class="settings-chevron">›</div>';
+        li.innerHTML=`<div class="song-icon ${getIndexColorClass(idx)}">${icon}</div><div class="song-info"><div class="song-title-list">${escapeHTML(s.title)}</div><div class="song-artist-list">${escapeHTML(s.artist||'No Artist')}</div></div>${right}`;
+        card.appendChild(li);
+    });
+    if(card)c.appendChild(card);
+}
+function filterSongs(){renderSongList($('song-search').value)}
+function startLongPress(id){if(isSelectionMode)return;cancelLongPress();longPressTimer=setTimeout(()=>enterSelectionMode(id),600)}
+function cancelLongPress(){clearTimeout(longPressTimer);longPressTimer=null}
+function enterSelectionMode(id){suppressNextClick=true;isSelectionMode=true;selectedSongIds.clear();selectedSongIds.add(id);updateSelectionUI();navigator.vibrate?.(50);setTimeout(()=>suppressNextClick=false,500)}
+function exitSelectionMode(){isSelectionMode=false;selectedSongIds.clear();updateSelectionUI()}
+function handleItemClick(id){
+    if(suppressNextClick)return;
+    if(isSelectionMode){
+        selectedSongIds.has(id)?selectedSongIds.delete(id):selectedSongIds.add(id);
+        if(!selectedSongIds.size)exitSelectionMode();else updateSelectionUI();
+    }else openSongDetail(id,true);
+}
+function updateSelectionUI(){
+    const anySel=isSelectionMode||isPlaylistSelectionMode;
+    $('selection-bar').classList.toggle('show',anySel);
+    document.body.classList.toggle('hide-nav',anySel||$('page-edit').classList.contains('active'));
+    const n=isSelectionMode?selectedSongIds.size:selectedPlaylistIds.size;
+    $('sel-delete-label').textContent=anySel?`削除 (${n})`:'削除';
+    renderSongList($('song-search').value);
+    renderPlaylistCollection();
+}
+async function deleteSelectedSongs(){
+    if(!selectedSongIds.size)return;
+    if(!await iosConfirm('削除しますか？',`${selectedSongIds.size}件の曲を削除します。この操作は取り消せません。`,'削除',true))return;
+    songLibrary=songLibrary.filter(s=>!selectedSongIds.has(s.id));
+    playlists.forEach(p=>p.songs=p.songs.filter(id=>!selectedSongIds.has(id)));
+    saveLibrary();savePlaylists();exitSelectionMode();updateSongCount();M_toast('削除しました');
+}
+function createNewSong(){
+    const id='song_'+Date.now();
+    songLibrary.push({id,title:'新規ソング',artist:'',key:'C',mode:'text',capo:0,content:'{title: 新規ソング}\n{key: C}\n\n[C] '});
+    saveLibrary();updateSongCount();
+    openSongDetail(id,true);
+    setTimeout(()=>enterEditMode(),80);
+}
+
+/* ============ 曲詳細 ============ */
+function openSongDetail(id,push=true){
+    const s=getSong(id);if(!s)return;
+    if(push)history.pushState({mode:'song',songId:id},'','#song='+encodeURIComponent(id));
+    currentSongId=id;
+    zoomLevel=100;$('zoom-slider').value=100;updateZoomFromSlider();closeZoomPanel();closeScrollPanel();
+    updateDetailView(s);
+    showPage('detail');
+    $('detail-scroll').scrollTop=0;
+}
+function _closeSongDetailView(){
+    currentSongId=null;
+    closeChordPopup();closeScrollPanel();closeZoomPanel();
+    if(activePage==='detail'||$('page-edit').classList.contains('active')){showPage('library')}
+    document.body.classList.remove('hide-nav');
+    renderSongList($('song-search').value);
+}
+function updateDetailView(s){
+    $('detail-title').textContent=s.title;
+    $('detail-artist').textContent=s.artist||'アーティスト未設定';
+    $('key-chip-text').textContent='Key: '+convertNoteNotation(s.key)+' / '+getRelativeMinor(s.key);
+    $('capo-chip-text').textContent='Capo: '+(s.capo||0);
+    const mode=s.mode==='diagram'?'text':(s.mode||'text');
+    $('mode-chip-text').textContent=mode==='power'?'Power Chord':mode==='nns'?'NNS':'コード名';
+    updateModeUI(mode);updateDiagUI(s);updateKeyUI(s.key||'C');updateCapoUI(s.capo||0);
+    renderScore(s);
+}
+
+/* ============ 編集 ============ */
+function enterEditMode(){if(!currentSongId)return;history.pushState({mode:'edit',songId:currentSongId},'','#edit');enterEditModeInternal()}
+function enterEditModeInternal(){
+    const s=getSong(currentSongId);if(!s)return;
+    closeZoomPanel();closeScrollPanel();closeChordPopup();
+    $('edit-source').value=s.content||'';
+    showPage('edit');
+    document.body.classList.add('hide-nav');
+}
+function saveCurrentSong(){
+    const s=getSong(currentSongId);if(!s)return;
+    const raw=$('edit-source').value;
+    s.content=raw;
+    s.title=(raw.match(/\{(?:title|t):\s*(.*?)\}/i)?.[1]||s.title||'No Title').trim();
+    s.artist=(raw.match(/\{(?:artist|a|subtitle|st):\s*(.*?)\}/i)?.[1]||s.artist||'').trim();
+    let key=(raw.match(/\{(?:key|k):\s*(.*?)\}/i)?.[1]||s.key||'C').trim();
+    if(key.endsWith('m')){const root=key.slice(0,-1);let idx=noteIndex(root);if(idx>=0)key=NOTES[(idx+3)%12]}
+    s.key=key;
+    saveLibrary();M_toast('保存しました');history.back();
+}
+async function handleEditBack(){
+    if(!await iosConfirm('編集を破棄して戻りますか？','保存していない変更は失われます。','破棄',true))return;
+    history.back();
+}
+
+/* ============ 音楽理論 ============ */
+function noteIndex(n){let i=NOTES.indexOf(n);if(i<0)i=NOTES_FLAT.indexOf(n);return i}
+function getNoteLabel(i){i=((i%12)+12)%12;return notationMode==='sharp'?NOTES[i]:NOTES_FLAT[i]}
+function convertNoteNotation(n){let i=noteIndex(n);return i>=0?getNoteLabel(i):n}
+function transposeNote(note,semitones){let i=noteIndex(note);return i<0?note:getNoteLabel(i+semitones)}
+function parseChordParts(c){const m=String(c).match(/^([A-G](?:#|b)?)(.*)$/);return m?{root:m[1],suffix:m[2]}:{root:c,suffix:''}}
+function getRelativeMinor(note){let i=noteIndex(note);return i<0?'?m':getNoteLabel(i+9)+'m'}
+
+/* ============ コード譜レンダリング ============ */
+function renderScore(s){
+    closeChordPopup();
+    const out=$('score-output');
+    const capo=s.capo||0;
+    const artist=escapeHTML(s.artist||'');
+    let html=artist?`<div class="score-artist-line">${artist}</div>`:'';
+    String(s.content||'').split('\n').forEach(line=>{
+        const tr=line.trim();
+        if(tr.startsWith('{')&&tr.endsWith('}')){
+            const inner=tr.slice(1,-1);
+            if(/^c:|^comment:/i.test(inner)) html+=`<div class="meta-block"><span class="meta-comment">${escapeHTML(inner.replace(/^(c:|comment:)\s*/i,''))}</span></div>`;
+            else if(!/^(title|t|artist|a|key|k|x-read)/i.test(inner)) html+=`<div class="meta-block">${escapeHTML(inner.replace(/^(subtitle:|st:)\s*/i,''))}</div>`;
+            return;
+        }
+        if(tr.startsWith('<検索用>')) return;
+        if(tr===''){html+='<div style="height:14px"></div>';return;}
+        if(!line.includes('[')){html+=`<div class="score-line-normal">${escapeHTML(line)}</div>`;return;}
+        const mode=(s.mode==='diagram')?'text':(s.mode||'text');
+        const diag=!!s.diag||s.mode==='diagram';
+        let row='<div class="score-row">';
+        let remaining=line;
+        const first=remaining.indexOf('[');
+        if(first>0){
+            row+= diag ? createSegment(null,remaining.slice(0,first)) : `<div class="chord-segment"><div class="segment-text">${escapeHTML(remaining.slice(0,first))}</div></div>`;
+            remaining=remaining.slice(first);
+        }
+        const re=/\[(.*?)\]([^\[]*)/g;let m;
+        while((m=re.exec(remaining))){
+            const chord=m[1],text=m[2];
+            if(isNonChord(chord)){
+                if(diag&&mode!=='nns') row+=`<div class="chord-segment"><div class="segment-chord seg-nc-diag">${escapeHTML(chord)}</div><div class="segment-text">${escapeHTML(text)}</div></div>`;
+                else row+=`<div class="chord-segment"><span class="chord-name nc">${escapeHTML(chord)}</span><div class="segment-text">${escapeHTML(text)}</div></div>`;
+                continue;
+            }
+            const p=parseChordParts(chord);
+            const root=capo?transposeNote(p.root,capo):p.root;
+            const displayChord=root+p.suffix;
+            if(mode==='nns'){
+                const degree=getDegreeHTML(displayChord,transposeNote(s.key||'C',capo));
+                row+=`<div class="chord-segment"><div class="nns-text-container">${degree}</div><div class="segment-text">${escapeHTML(text)}</div></div>`;
+            }else{
+                const shown=(mode==='power')?convertNoteNotation(root)+'5':convertNoteNotation(root)+p.suffix;
+                if(diag) row+=createSegment(generateChordSvg(displayChord,shown,mode),text);
+                else row+=`<div class="chord-segment"><span class="chord-name" data-chord="${escapeHTML(displayChord)}" data-shown="${escapeHTML(shown)}">${escapeHTML(shown)}</span><div class="segment-text">${escapeHTML(text)}</div></div>`;
+            }
+        }
+        row+='</div>';html+=row;
+    });
+    out.innerHTML=html;
+}
+function isNonChord(str){return /^[|\-<>○\s←→↑↓]+$/.test(str)||['N.C.','NC'].includes(str)||/[゠-ヿ｠-ﾟ]/.test(str)}
+function createSegment(svg,text){return svg?`<div class="chord-segment"><div class="segment-chord">${svg}</div><div class="segment-text">${escapeHTML(text)}</div></div>`:`<div class="chord-segment"><div class="segment-chord" style="height:56px;width:0"></div><div class="segment-text">${escapeHTML(text)}</div></div>`}
+function getDegreeHTML(raw,key){
+    const m=raw.replace('on','/').match(/^([A-G](?:#|b)?)([^/]*)(?:\/(.*))?/);
+    if(!m)return escapeHTML(raw);
+    const keyIdx=noteIndex(key),rootIdx=noteIndex(m[1]);
+    if(keyIdx<0||rootIdx<0)return escapeHTML(raw);
+    let qual=(m[2]||'').replace(/^maj$/,'').replace(/^min$/,'m').replace(/^maj7$/,'M7').replace(/^m7b5|m7\(-5\)|m7\(b5\)$/,'m7-5').replace(/^m9$/,'m7(9)').replace(/^9$/,'7(9)');
+    if(qual.startsWith('m')&&qual!=='m7-5')qual=qual.replace(/^m/,'-');
+    qual=qual.replace('M7','△7').replace('aug','+').replace('dim','°');
+    const rootDeg=getDegreeLabel(rootIdx,keyIdx);
+    let html=`<span class="cn-root">${rootDeg}</span>`;
+    if(qual)html+=`<sup class="cn-qual">${escapeHTML(qual)}</sup>`;
+    if(m[3]){const bi=noteIndex(m[3]);if(bi>=0)html+=`<span class="cn-slash">/</span><span class="cn-bass">${getDegreeLabel(bi,keyIdx)}</span>`}
+    return html;
+}
+function getDegreeLabel(note,key){const labels=notationMode==='flat'?MajorDegrees.flat:MajorDegrees.sharp;return labels[(note-key+12)%12]}
+
+/* ============ コードダイアグラム SVG ============ */
+function generateChordSvg(raw,display,mode){
+    const t=TUNINGS[tuningId]||TUNINGS.std;
+    let shape=null;
+    if(mode==='power'&&display.endsWith('5')){
+        const r=parseChordParts(display).root,idx=noteIndex(r);
+        if(idx>=0)shape=getPowerChordShape(NOTES[(idx+t.shift)%12],t.drop);
+    }
+    if(!shape){
+        let raw2=raw;
+        if(t.shift){const p=parseChordParts(raw),r2=transposeNote(p.root,t.shift);if(r2)raw2=r2+p.suffix}
+        shape=getChordShape(raw2);
+        if(shape&&t.drop)shape=applyDropD(shape,raw2);
+    }
+    if(!shape)shape=[-1,-1,-1,-1,-1,-1];
+    const w=64,h=56,mt=16,mr=10,mb=8,ml=10,gw=w-ml-mr,gh=h-mt-mb,strings=6,frets=4,sg=gh/(strings-1),fg=gw/frets;
+    const vals=shape.filter(f=>f>0),min=vals.length?Math.min(...vals):0,max=vals.length?Math.max(...vals):0,base=max>4?min:1;
+    const INK=diagInk();
+    let svg=`<text x="${w/2}" y="${mt/2+2}" font-family="Arial" font-weight="900" font-size="${display.length>4?10:display.length>2?11:12}px" text-anchor="middle" dominant-baseline="central" fill="${INK}">${escapeHTML(display).replace(/b/g,'♭')}</text>`;
+    for(let i=0;i<strings;i++){const y=Math.round(mt+i*sg);svg+=`<line x1="${ml}" y1="${y}" x2="${ml+gw}" y2="${y}" stroke="${INK}" stroke-width="1"/>`}
+    for(let i=0;i<=frets;i++){const x=Math.round(ml+i*fg);svg+=`<line x1="${x}" y1="${mt}" x2="${x}" y2="${mt+gh}" stroke="${INK}" stroke-width="${i===0&&base===1?2:1}"/>`}
+    if(base>1)svg+=`<text x="${ml}" y="${h-4}" font-family="serif" font-weight="bold" font-size="11" text-anchor="middle" dominant-baseline="central" fill="${INK}">${base}</text>`;
+    shape.forEach((f,idx)=>{
+        const cy=mt+(strings-1-idx)*sg;
+        if(f>0){
+            const fp=f-base+1;
+            if(fp>=1&&fp<=4){const cx=ml+(fp-.5)*fg;svg+=`<circle cx="${cx}" cy="${cy}" r="2.6" fill="${INK}"/>`}
+        }else if(f===0)svg+=`<circle cx="${ml/2}" cy="${cy}" r="1.8" stroke="${INK}" fill="none"/>`;
+        else svg+=`<line x1="${ml/2-2}" y1="${cy-2}" x2="${ml/2+2}" y2="${cy+2}" stroke="${INK}"/><line x1="${ml/2+2}" y1="${cy-2}" x2="${ml/2-2}" y2="${cy+2}" stroke="${INK}"/>`;
+    });
+    return `<svg width="64" height="56" viewBox="0 0 64 56" class="chord-diagram">${svg}</svg>`;
+}
+function getChordShape(chord){
+    if(CHORD_SHAPES[chord])return CHORD_SHAPES[chord];
+    const p=parseChordParts(chord);
+    if(CHORD_SHAPES[p.root+p.suffix])return CHORD_SHAPES[p.root+p.suffix];
+    const norm=p.suffix.replace('M7','maj7');
+    if(CHORD_SHAPES[p.root+norm])return CHORD_SHAPES[p.root+norm];
+    if(ENHARMONIC[p.root])return CHORD_SHAPES[ENHARMONIC[p.root]+p.suffix]||CHORD_SHAPES[ENHARMONIC[p.root]+norm]||CHORD_SHAPES[ENHARMONIC[p.root]];
+    return CHORD_SHAPES[p.root]||null;
+}
+function getPowerChordShape(root,dropd){
+    let idx=noteIndex(root);if(idx<0)return null;
+    if(dropd){const f6=(idx-2+12)%12,f5=(idx-9+12)%12;if(f6<=4||f6<f5)return[f6,f6,f6,-1,-1,-1];return f5===0?[-1,0,2,2,-1,-1]:[-1,f5,f5+2,f5+2,-1,-1]}
+    const f6=(idx-4+12)%12,f5=(idx-9+12)%12;
+    if(f6<=4||f6<f5)return f6===0?[0,2,2,-1,-1,-1]:[f6,f6+2,f6+2,-1,-1,-1];
+    return f5===0?[-1,0,2,2,-1,-1]:[-1,f5,f5+2,f5+2,-1,-1];
+}
+function applyDropD(shape,raw){
+    const sh=shape.slice();
+    if(sh[0]>=0){sh[0]+=2}else{const r=parseChordParts(raw||'').root;if(r&&noteIndex(r)===2)sh[0]=0}
+    const vals=sh.filter(f=>f>0);
+    if(vals.length&&shape[0]>=0){const mx=Math.max(...vals),mn=Math.min(...vals);if((mx>4&&mx-mn>3)||(mx>4&&sh.includes(0)))sh[0]=-1}
+    return sh;
+}
+
+/* ============ コードポップアップ ============ */
+let popupChord=null;
+function showChordPopup(chord,shown){
+    const p=$('chord-popup');
+    if(popupChord===chord&&p.classList.contains('show')){closeChordPopup();return}
+    popupChord=chord;
+    let mode=getSong(currentSongId)?.mode||'text';if(mode==='diagram')mode='text';
+    $('chord-popup-body').innerHTML=generateChordSvg(chord,shown,mode);
+    p.classList.add('show');
+    document.querySelectorAll('.chord-name').forEach(e=>e.classList.toggle('playing',e.dataset.chord===chord));
+}
+function closeChordPopup(){const p=$('chord-popup');if(p)p.classList.remove('show');popupChord=null;document.querySelectorAll('.chord-name.playing').forEach(e=>e.classList.remove('playing'))}
+
+/* ============ ズーム ============ */
+function toggleZoomPanel(){const p=$('zoom-panel');const on=!p.classList.contains('show');p.classList.toggle('show',on);$('zoom-btn').classList.toggle('on',on);if(on)closeScrollPanel()}
+function closeZoomPanel(){$('zoom-panel').classList.remove('show');$('zoom-btn').classList.remove('on')}
+function updateZoomFromSlider(){
+    zoomLevel=parseInt($('zoom-slider').value);
+    $('zoom-val-text').textContent=zoomLevel+'%';
+    const pct=((zoomLevel-50)/250*100);
+    $('zoom-slider').style.setProperty('--p',pct+'%');
+    applyZoom(zoomLevel/100);
+}
+function applyZoom(scale){const c=$('zoom-container');c.style.transform=`scale(${scale})`;c.style.width=`${100/scale}%`}
+
+/* ============ オートスクロール ============ */
+function toggleScrollPanel(){const p=$('scroll-panel');const on=!p.classList.contains('show');p.classList.toggle('show',on);$('scroll-btn').classList.toggle('on',on);if(!on)stopAutoScroll();else closeZoomPanel()}
+function closeScrollPanel(){$('scroll-panel').classList.remove('show');$('scroll-btn').classList.remove('on');stopAutoScroll()}
+function toggleAutoScroll(){isScrolling?stopAutoScroll():startAutoScroll()}
+function startAutoScroll(){
+    isScrolling=true;
+    const b=$('scroll-play-btn');
+    b.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+    b.classList.add('stop');
+    let last=0,acc=0;
+    const step=t=>{
+        if(!isScrolling)return;
+        if(last){
+            const speed=parseInt($('scroll-speed').value)*2;
+            acc+=speed*(t-last)/1000;
+            if(acc>=1){const px=Math.floor(acc);$('detail-scroll').scrollTop+=px;acc-=px}
+        }
+        last=t;requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}
+function stopAutoScroll(){
+    isScrolling=false;
+    const b=$('scroll-play-btn');
+    b.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    b.classList.remove('stop');
+}
+
+/* ============ 表示設定 ============ */
+function setNotation(mode){notationMode=mode;localStorage.setItem('cv_notation',mode);updateSettingsUI();initCompactKeySelect();if(currentSongId)updateDetailView(getSong(currentSongId))}
+function updateSettingsUI(){
+    $('notation-sharp-row').classList.toggle('selected',notationMode==='sharp');
+    $('notation-flat-row').classList.toggle('selected',notationMode==='flat');
+    $('accent-value').textContent=ACCENTS[accentId].label;
+    $('theme-value').textContent=THEMES[themeId].label;
+}
+function updateModeUI(mode){document.querySelectorAll('#settings-sheet .settings-row[data-mode]').forEach(e=>e.classList.toggle('selected',e.dataset.mode===mode))}
+function openSettingsSheet(){if(!currentSongId){M_toast('曲を選択してください');return}$('settings-sheet').classList.add('show')}
+function closeSettingsSheet(){$('settings-sheet').classList.remove('show')}
+function toggleDiag(){const s=getSong(currentSongId);if(!s)return;s.diag=!(s.diag||s.mode==='diagram');if(s.mode==='diagram')s.mode='text';saveLibrary();updateDetailView(s)}
+function updateDiagUI(s){const on=!!s.diag||s.mode==='diagram';$('diag-toggle-row').classList.toggle('selected',on)}
+function setMode(m){const s=getSong(currentSongId);if(!s)return;s.mode=m;saveLibrary();updateDetailView(s)}
+function setTuning(id){if(!TUNINGS[id])id='std';tuningId=id;localStorage.setItem('cv_tuning',id);updateTuningUI();if(currentSongId){const sg=getSong(currentSongId);if(sg)renderScore(sg)}}
+function renderTuningList(){
+    const c=$('tuning-list');c.innerHTML='';
+    Object.entries(TUNINGS).forEach(([id,t])=>{
+        const row=document.createElement('div');
+        row.className='settings-row'+(id===tuningId?' selected':'');
+        row.dataset.tuning=id;
+        row.innerHTML=`<div class="settings-icon"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div><div class="settings-label">${escapeHTML(t.label)}<div class="settings-sub">${escapeHTML(t.desc)}</div></div><div class="settings-check">✓</div>`;
+        row.onclick=()=>setTuning(id);
+        c.appendChild(row);
+    });
+}
+function updateTuningUI(){document.querySelectorAll('#tuning-list .settings-row').forEach(e=>e.classList.toggle('selected',e.dataset.tuning===tuningId))}
+function applyTheme(){
+    document.documentElement.setAttribute('data-theme',themeId);
+    const meta=document.querySelector('meta[name="theme-color"]');
+    if(meta)meta.setAttribute('content',themeId==='light'?'#f9f9fb':'#000000');
+    updateSettingsUI();
+    // ダイアグラムの描画色を反映
+    if(currentSongId){const s=getSong(currentSongId);if(s)renderScore(s)}
+    if(popupChord)closeChordPopup();
+}
+async function pickTheme(){
+    const keys=Object.keys(THEMES);
+    const i=await actionSheet('テーマ',keys.map(k=>({label:THEMES[k].label,active:k===themeId})));
+    if(i<0)return;
+    themeId=keys[i];localStorage.setItem('cv_theme',themeId);applyTheme();
+}
+function applyAccent(){document.documentElement.style.setProperty('--primary-color',ACCENTS[accentId].c);updateSettingsUI()}
+async function pickAccent(){
+    const keys=Object.keys(ACCENTS);
+    const i=await actionSheet('アクセントカラー',keys.map(k=>({label:ACCENTS[k].label,active:k===accentId})));
+    if(i<0)return;
+    accentId=keys[i];localStorage.setItem('cv_accent',accentId);applyAccent();
+}
+
+/* ---- Key / Capo ---- */
+function initCompactKeySelect(){
+    const p=$('compact-key-picker');if(!p)return;
+    const cur=p.value;p.innerHTML='';
+    for(let i=0;i<12;i++){
+        const root=notationMode==='sharp'?NOTES[i]:NOTES_FLAT[i];
+        const o=document.createElement('option');
+        o.value=NOTES[i];o.textContent=`${root} / ${getRelativeMinor(root)}`;
+        p.appendChild(o);
+    }
+    if(cur)p.value=cur;
+}
+function initCapoSelect(){
+    const p=$('compact-capo-picker');p.innerHTML='';
+    for(let i=0;i<12;i++){const o=document.createElement('option');o.value=i;o.textContent=i===0?'0 (なし)':String(i);p.appendChild(o)}
+}
+function changeKeyFromCompact(el){const s=getSong(currentSongId);if(!s)return;s.key=el.value;saveLibrary();updateDetailView(s)}
+function updateKeyUI(key){const p=$('compact-key-picker');const i=noteIndex(key);if(p&&i>=0)p.value=NOTES[i]}
+function changeCapo(el){const s=getSong(currentSongId);if(!s)return;s.capo=parseInt(el.value);saveLibrary();updateDetailView(s)}
+function updateCapoUI(capo){$('compact-capo-picker').value=capo}
+
+/* ============ データ管理 ============ */
+function exportData(){
+    const b=new Blob([JSON.stringify(songLibrary,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(b);a.download='chord_library.json';a.click();
+    URL.revokeObjectURL(a.href);
+}
+function importData(input){
+    const file=input.files?.[0];if(!file)return;
+    const r=new FileReader();
+    r.onload=async e=>{
+        try{
+            const imp=JSON.parse(e.target.result);
+            const items=Array.isArray(imp)?imp:[imp];
+            if(!await iosConfirm('読み込みますか？',`${items.length}件のデータをライブラリに追加します。`,'追加'))return;
+            items.forEach(ns=>{
+                if(!ns||typeof ns!=='object')return;
+                if(!ns.id)ns.id='song_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+                if(!ns.title)ns.title='No Title';
+                if(!ns.content)ns.content='{title: No Title}\n{key: C}\n\n[C] ';
+                const i=songLibrary.findIndex(ex=>ex.id===ns.id);
+                i>=0?songLibrary[i]=ns:songLibrary.push(ns);
+            });
+            saveLibrary();renderSongList($('song-search').value);updateSongCount();M_toast('読み込み完了');
+        }catch(err){console.error(err);M_toast('JSONファイルの読み込みに失敗しました')}
+        finally{input.value=''}
+    };
+    r.readAsText(file);
+}
+async function resetAllData(){
+    if(!await iosConfirm('全データを削除しますか？','曲・プレイリスト・設定をすべて消去します。この操作は取り消せません。','削除',true))return;
+    localStorage.removeItem('cv_library');
+    localStorage.removeItem('cv_playlists');
+    localStorage.removeItem('cv_notation');
+    localStorage.removeItem('cv_tuning');
+    localStorage.removeItem('cv_accent');
+    localStorage.removeItem('cv_theme');
+    location.reload();
+}
+function updateSongCount(){$('song-count-info').textContent=String(songLibrary.length)}
+
+/* ============ プレイリスト ============ */
+function renderPlaylistCollection(){
+    const c=$('playlist-collection');c.innerHTML='';
+    if(!playlists.length){
+        c.innerHTML=`<div class="empty-library">
+            <svg viewBox="0 0 24 24" class="svg-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            <p>プレイリストがありません</p>
+            <span>右上の「＋」からプレイリストを作成できます</span>
+        </div>`;
+        return;
+    }
+    playlists.forEach(pl=>{
+        const row=document.createElement('div');
+        row.className='list-row'+(selectedPlaylistIds.has(pl.id)?' selected':'');
+        row.addEventListener('touchstart',()=>startPlaylistLongPress(pl.id),{passive:true});
+        row.addEventListener('touchend',cancelLongPress,{passive:true});
+        row.addEventListener('touchmove',cancelLongPress,{passive:true});
+        row.addEventListener('mousedown',()=>startPlaylistLongPress(pl.id));
+        row.addEventListener('mouseup',cancelLongPress);
+        row.addEventListener('mouseleave',cancelLongPress);
+        row.addEventListener('contextmenu',e=>{e.preventDefault();if(!isPlaylistSelectionMode)enterPlaylistSelectionMode(pl.id)});
+        row.onclick=()=>handlePlaylistItemClick(pl.id);
+        const right=isPlaylistSelectionMode
+            ?(selectedPlaylistIds.has(pl.id)?'<div class="song-check">✓</div>':'<div style="width:24px;"></div>')
+            :'<div class="settings-chevron">›</div>';
+        row.innerHTML=`<div class="list-cover-empty"><svg viewBox="0 0 24 24" class="svg-icon" style="width:26px;height:26px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div><div class="list-row-info"><div class="list-row-title">${escapeHTML(pl.title)}</div><div class="list-row-count">${pl.songs.length} 曲</div></div>${right}`;
+        c.appendChild(row);
+    });
+}
+function startPlaylistLongPress(id){if(isPlaylistSelectionMode)return;cancelLongPress();longPressTimer=setTimeout(()=>enterPlaylistSelectionMode(id),600)}
+function enterPlaylistSelectionMode(id){suppressNextClick=true;isPlaylistSelectionMode=true;selectedPlaylistIds.clear();selectedPlaylistIds.add(id);updateSelectionUI();navigator.vibrate?.(50);setTimeout(()=>suppressNextClick=false,500)}
+function exitPlaylistSelectionMode(){isPlaylistSelectionMode=false;selectedPlaylistIds.clear();updateSelectionUI()}
+function handlePlaylistItemClick(id){
+    if(suppressNextClick)return;
+    if(isPlaylistSelectionMode){
+        selectedPlaylistIds.has(id)?selectedPlaylistIds.delete(id):selectedPlaylistIds.add(id);
+        if(!selectedPlaylistIds.size)exitPlaylistSelectionMode();else updateSelectionUI();
+    }else openPlaylistDetail(id);
+}
+async function deleteSelectedPlaylists(){
+    if(!selectedPlaylistIds.size)return;
+    if(!await iosConfirm('削除しますか？',`${selectedPlaylistIds.size}件のプレイリストを削除します。`,'削除',true))return;
+    playlists=playlists.filter(p=>!selectedPlaylistIds.has(p.id));
+    savePlaylists();exitPlaylistSelectionMode();M_toast('削除しました');
+}
+async function createPlaylist(){
+    const name=await iosPrompt('プレイリスト名');
+    if(!name)return;
+    playlists.push({id:'pl_'+Date.now(),title:name,songs:[]});
+    savePlaylists();renderPlaylistCollection();
+}
+function openPlaylistDetail(id){history.pushState({mode:'playlist_detail',playlistId:id},'','#playlist/'+encodeURIComponent(id));_openPlaylistDetailInternal(id)}
+function _openPlaylistDetailInternal(id){
+    currentPlaylistId=id;
+    const pl=playlists.find(p=>p.id===id);if(!pl)return;
+    $('playlist-collection').style.display='none';
+    $('playlist-song-container').style.display='block';
+    $('pl-header-title').textContent=pl.title;
+    $('pl-back-btn').style.display='flex';
+    $('pl-add-btn').style.display='none';
+    $('pl-addsong-btn').style.display='flex';
+    renderPlaylistSongs(pl);
+}
+function _closePlaylistDetail(){
+    currentPlaylistId=null;
+    $('playlist-collection').style.display='flex';
+    $('playlist-song-container').style.display='none';
+    $('pl-header-title').textContent='プレイリスト';
+    $('pl-back-btn').style.display='none';
+    $('pl-add-btn').style.display='flex';
+    $('pl-addsong-btn').style.display='none';
+    renderPlaylistCollection();
+}
+function renderPlaylistSongs(pl){
+    const c=$('playlist-song-container');c.innerHTML='';
+    if(!pl.songs.length){
+        c.innerHTML=`<div class="empty-library">
+            <svg viewBox="0 0 24 24" class="svg-icon"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+            <p>曲がありません</p>
+            <span>右上の「♪＋」からライブラリの曲を追加できます</span>
+        </div>`;
+        return;
+    }
+    const card=document.createElement('div');card.className='song-group';card.style.marginTop='12px';
+    pl.songs.forEach((id,idx)=>{
+        const s=getSong(id);if(!s)return;
+        const li=document.createElement('div');
+        li.className='song-item';
+        li.onclick=()=>openSongDetail(s.id,true);
+        const iCls=getIndexColorClass(getIndexChar(s.title));
+        li.innerHTML=`<div class="song-icon ${iCls}">${escapeHTML((s.title||'?').charAt(0))}</div><div class="song-info"><div class="song-title-list">${escapeHTML(s.title)}</div><div class="song-artist-list">${escapeHTML(s.artist||'')}</div></div><button class="icon-btn pl-remove" style="color:var(--sub-text-color);" aria-label="削除"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg></button>`;
+        li.querySelector('.pl-remove').onclick=e=>{e.stopPropagation();removeSongFromPlaylist(pl.id,idx)};
+        card.appendChild(li);
+    });
+    c.appendChild(card);
+}
+function removeSongFromPlaylist(plId,idx){
+    const pl=playlists.find(p=>p.id===plId);if(!pl)return;
+    pl.songs.splice(idx,1);savePlaylists();renderPlaylistSongs(pl);
+}
+function openSongPicker(){
+    const pl=playlists.find(p=>p.id===currentPlaylistId);if(!pl)return;
+    const list=$('picker-list');list.innerHTML='';
+    const existing=new Set(pl.songs);
+    [...songLibrary].sort((a,b)=>String(a.title||'').localeCompare(String(b.title||''),'ja')).forEach(s=>{
+        const div=document.createElement('div');
+        div.className='picker-item'+(existing.has(s.id)?' already':'');
+        div.dataset.id=s.id;
+        if(!existing.has(s.id))div.onclick=()=>div.classList.toggle('selected');
+        div.innerHTML=`<span class="picker-check">✓</span><div><div class="picker-title">${escapeHTML(s.title)}</div><div class="picker-artist">${escapeHTML(s.artist||'')}</div></div>`;
+        list.appendChild(div);
+    });
+    $('song-picker-modal').classList.add('show');
+}
+function closeSongPicker(){$('song-picker-modal').classList.remove('show')}
+function addSongsToPlaylist(){
+    const pl=playlists.find(p=>p.id===currentPlaylistId);if(!pl)return;
+    document.querySelectorAll('#picker-list .picker-item.selected').forEach(el=>{
+        if(!pl.songs.includes(el.dataset.id))pl.songs.push(el.dataset.id);
+    });
+    savePlaylists();closeSongPicker();renderPlaylistSongs(pl);M_toast('追加しました');
+}
+
+/* ============ チューナー ============ */
+async function startTuner(){
+    try{
+        audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        analyser=audioCtx.createAnalyser();
+        analyser.fftSize=4096;
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        audioCtx.createMediaStreamSource(stream).connect(analyser);
+        updatePitch();
+    }catch(e){
+        M_toast('マイク使用許可が必要です');
+        const btn=$('tuner-toggle-btn');btn.textContent='開始';btn.classList.remove('on');
+    }
+}
+function toggleTuner(){
+    const btn=$('tuner-toggle-btn');
+    if(audioCtx&&audioCtx.state!=='closed'){
+        audioCtx.close();cancelAnimationFrame(tunerRaf);
+        btn.textContent='開始';btn.classList.remove('on');
+    }else{
+        startTuner();
+        btn.textContent='停止';btn.classList.add('on');
+    }
+}
+function updatePitch(){
+    if(!analyser||!audioCtx)return;
+    const buf=new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(buf);
+    const freq=autoCorrelate(buf,audioCtx.sampleRate);
+    if(freq!==-1&&isFinite(freq)){
+        $('tuner-freq').textContent=Math.round(freq);
+        const n=Math.round(12*Math.log2(freq/440)+69);
+        $('tuner-note').textContent=getNoteLabel(n);
+        const cents=1200*Math.log2(freq/(440*Math.pow(2,(n-69)/12)));
+        $('tuner-needle').style.left=Math.max(0,Math.min(100,50+cents))+'%';
+    }
+    tunerRaf=requestAnimationFrame(updatePitch);
+}
+function autoCorrelate(buf,sr){
+    let rms=0;for(let i=0;i<buf.length;i++)rms+=buf[i]*buf[i];
+    if(Math.sqrt(rms/buf.length)<.01)return-1;
+    let r1=0,r2=buf.length-1;
+    for(let i=0;i<buf.length/2;i++)if(Math.abs(buf[i])<.2){r1=i;break}
+    for(let i=1;i<buf.length/2;i++)if(Math.abs(buf[buf.length-i])<.2){r2=buf.length-i;break}
+    buf=buf.slice(r1,r2);
+    const c=new Array(buf.length).fill(0);
+    for(let i=0;i<buf.length;i++)for(let j=0;j<buf.length-i;j++)c[i]+=buf[j]*buf[j+i];
+    let d=0;while(c[d]>c[d+1])d++;
+    let max=-1,pos=-1;
+    for(let i=d;i<buf.length;i++)if(c[i]>max){max=c[i];pos=i}
+    const denom=2*(c[pos+1]+c[pos-1]-2*c[pos]);
+    return sr/(pos-(denom?((c[pos+1]-c[pos-1])/denom):0));
+}
+
+/* ============ 初期化 & イベント配線 ============ */
+function init(){
+    applyTheme();
+    applyAccent();
+    loadLibrary();
+    if(!localStorage.getItem('cv_tuning')&&(songLibrary||[]).some(x=>x&&x.dropd)){tuningId='dropd';localStorage.setItem('cv_tuning','dropd')}
+    loadPlaylists();
+    renderTuningList();
+    initCompactKeySelect();initCapoSelect();updateSettingsUI();
+    if(songLibrary.length===0){songLibrary=[structuredClone(SAMPLE_SONG)];saveLibrary()}
+    updateSongCount();
+    renderSongList();
+    renderPlaylistCollection();
+
+    /* コード名タップ → 押さえ方ポップアップ */
+    $('score-output').addEventListener('click',e=>{
+        const el=e.target.closest('.chord-name');
+        if(el&&!el.classList.contains('nc'))showChordPopup(el.dataset.chord,el.dataset.shown);
+    });
+
+    /* ライブラリ */
+    $('add-song-btn').onclick=createNewSong;
+    $('song-search').addEventListener('input',filterSongs);
+
+    /* 選択バー */
+    $('sel-cancel-btn').onclick=()=>{if(isSelectionMode)exitSelectionMode();if(isPlaylistSelectionMode)exitPlaylistSelectionMode()};
+    $('sel-all-btn').onclick=()=>{
+        if(isSelectionMode){songLibrary.forEach(s=>selectedSongIds.add(s.id));updateSelectionUI()}
+        else if(isPlaylistSelectionMode){playlists.forEach(p=>selectedPlaylistIds.add(p.id));updateSelectionUI()}
+    };
+    $('sel-delete-btn').onclick=()=>{if(isSelectionMode)deleteSelectedSongs();else if(isPlaylistSelectionMode)deleteSelectedPlaylists()};
+
+    /* 曲詳細 */
+    $('detail-back-btn').onclick=()=>{if(history.state)history.back();else _closeSongDetailView()};
+    $('edit-btn').onclick=enterEditMode;
+    $('zoom-btn').onclick=toggleZoomPanel;
+    $('scroll-btn').onclick=toggleScrollPanel;
+    $('key-chip').onclick=openSettingsSheet;
+    $('capo-chip').onclick=openSettingsSheet;
+    $('mode-chip').onclick=openSettingsSheet;
+    $('zoom-slider').addEventListener('input',updateZoomFromSlider);
+    $('zoom-close-btn').onclick=closeZoomPanel;
+    $('scroll-play-btn').onclick=toggleAutoScroll;
+    $('scroll-close-btn').onclick=closeScrollPanel;
+    $('chord-popup-close').onclick=closeChordPopup;
+
+    /* 編集 */
+    $('edit-back-btn').onclick=handleEditBack;
+    $('save-btn').onclick=saveCurrentSong;
+
+    /* 表示設定シート */
+    document.querySelectorAll('#settings-sheet .settings-row[data-mode]').forEach(row=>{
+        row.addEventListener('click',e=>{if(e.target.tagName==='SELECT')return;setMode(row.dataset.mode)});
+    });
+    $('diag-toggle-row').onclick=toggleDiag;
+    $('compact-key-picker').addEventListener('change',e=>changeKeyFromCompact(e.target));
+    $('compact-capo-picker').addEventListener('change',e=>changeCapo(e.target));
+    $('sheet-close-btn').onclick=closeSettingsSheet;
+    $('sheet-close-x').onclick=closeSettingsSheet;
+    $('settings-sheet').addEventListener('click',e=>{if(e.target===$('settings-sheet'))closeSettingsSheet()});
+
+    /* プレイリスト */
+    $('pl-add-btn').onclick=createPlaylist;
+    $('pl-back-btn').onclick=()=>{if(history.state?.mode==='playlist_detail')history.back();else _closePlaylistDetail()};
+    $('pl-addsong-btn').onclick=openSongPicker;
+    $('picker-close-btn').onclick=closeSongPicker;
+    $('picker-add-btn').onclick=addSongsToPlaylist;
+    $('song-picker-modal').addEventListener('click',e=>{if(e.target===$('song-picker-modal'))closeSongPicker()});
+
+    /* 設定 */
+    $('notation-sharp-row').onclick=()=>setNotation('sharp');
+    $('notation-flat-row').onclick=()=>setNotation('flat');
+    $('theme-row').onclick=pickTheme;
+    $('accent-row').onclick=pickAccent;
+    $('export-row').onclick=exportData;
+    $('import-row').onclick=()=>$('import-file').click();
+    $('import-file').addEventListener('change',e=>importData(e.target));
+    $('reset-row').onclick=resetAllData;
+
+    /* チューナー */
+    $('tuner-toggle-btn').onclick=toggleTuner;
+
+    /* URLハッシュから曲を復元 */
+    const m=location.hash.match(/^#song=(.+)$/);
+    if(m){
+        const id=decodeURIComponent(m[1]);
+        history.replaceState({mode:'song',songId:id},'',location.href);
+        openSongDetail(id,false);
+    }else{
+        history.replaceState(null,'',location.pathname+location.search);
+    }
+}
+window.addEventListener('load',init);
+</script>
 </body>
 </html>

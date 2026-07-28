@@ -1,0 +1,10 @@
+# さきいかビルダーの出力と署名鍵 (鍵は絶対にコミットしない)
+sakiika-out/
+www/
+sakiika-key.pem
+*.apk
+*.aab
+
+# Windows
+Thumbs.db
+desktop.ini
