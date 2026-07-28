@@ -13,6 +13,21 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>コードノート</title>
+<script>
+/* 保存済みテーマを最初の描画前に適用する。
+   load 後の applyTheme() 任せだと、ライトモード設定でも
+   CSS 既定のダーク配色で一瞬描画されてしまう。 */
+(function(){try{
+    if(localStorage.getItem('cv_theme')==='light'){
+        document.documentElement.setAttribute('data-theme','light');
+        var m=document.querySelector('meta[name="theme-color"]');
+        if(m)m.setAttribute('content','#f9f9fb');
+    }
+    var ACC={blue:'#7bb3d7',pink:'#f79ecd',red:'#ff453a',orange:'#ff9f0a'};
+    var a=localStorage.getItem('cv_accent');
+    if(a&&ACC[a])document.documentElement.style.setProperty('--primary-color',ACC[a]);
+}catch(e){}})();
+</script>
 <style>
 /* ============================================================
    オンコミ (ON-Comi) デザインシステム — style.css 由来
