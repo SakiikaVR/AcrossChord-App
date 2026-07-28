@@ -1648,8 +1648,21 @@ function addSongsToPlaylist(){
 }
 
 /* ============ チューナー ============ */
+async function ensureMicPermission(){
+    // Android アプリ内では OS の実行時権限を先に確保する。
+    // 「今回のみ」で許可された権限はアプリ終了時に失効するため、
+    // 失効していれば毎回ここでダイアログを出し直す。
+    if(!(window.Android&&Android.available))return true;
+    try{
+        const c=await Android.perm.check({permissions:['RECORD_AUDIO']});
+        if(c&&c.granted)return true;
+        const r=await Android.perm.request({permissions:['RECORD_AUDIO']});
+        return !!(r&&r.granted);
+    }catch(e){return false}
+}
 async function startTuner(){
     try{
+        if(!await ensureMicPermission())throw new Error('permission');
         audioCtx=new (window.AudioContext||window.webkitAudioContext)();
         analyser=audioCtx.createAnalyser();
         analyser.fftSize=4096;
