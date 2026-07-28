@@ -1002,7 +1002,7 @@ let isSelectionMode=false,isPlaylistSelectionMode=false;
 let selectedSongIds=new Set(),selectedPlaylistIds=new Set();
 let longPressTimer=null,suppressNextClick=false;
 let scrollInterval=null,isScrolling=false,zoomLevel=100;
-let audioCtx=null,analyser=null,tunerRaf=null;
+let audioCtx=null,analyser=null,tunerRaf=null,micStream=null,bridgeTuner=null;
 let activePage='library';
 
 const $=id=>document.getElementById(id);
@@ -1660,42 +1660,111 @@ async function ensureMicPermission(){
         return !!(r&&r.granted);
     }catch(e){return false}
 }
+async function startTunerWebAudio(){
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('mediaDevices unavailable');
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=4096;
+    try{
+        micStream=await navigator.mediaDevices.getUserMedia({audio:true});
+        audioCtx.createMediaStreamSource(micStream).connect(analyser);
+        updatePitch();
+    }catch(e){
+        try{audioCtx.close()}catch(_){}
+        audioCtx=null;analyser=null;micStream=null;
+        throw e;
+    }
+}
+/* getUserMedia が使えない WebView 向け: reflect ブリッジで AudioRecord を直接駆動 */
+async function startTunerBridge(){
+    const R=Android.reflect,SR=44100,N=2048;
+    const min=await R.staticCall({class:'android.media.AudioRecord',method:'getMinBufferSize',args:[SR,16,2]});
+    const bufBytes=Math.max((typeof min==='number'&&min>0)?min:0,N*4);
+    let rec=null;
+    for(const src of[6,1]){ // VOICE_RECOGNITION(6) が使えなければ MIC(1)
+        try{
+            const cand=await R['new']({class:'android.media.AudioRecord',args:[src,SR,16,2,bufBytes]});
+            if(await R.call({ref:cand.__ref,method:'getState'})===1){rec=cand;break}
+            try{await R.call({ref:cand.__ref,method:'release'})}catch(_){}
+            try{await R.release({ref:cand.__ref})}catch(_){}
+        }catch(_){}
+    }
+    if(!rec)throw new Error('AudioRecord unavailable');
+    const buf=await R.arrayOf({component:'short',length:N});
+    await R.call({ref:rec.__ref,method:'startRecording'});
+    bridgeTuner={rec:rec.__ref,buf:buf.__ref,sr:SR,n:N};
+    bridgeTunerLoop();
+}
+async function bridgeTunerLoop(){
+    const R=Android.reflect;
+    while(bridgeTuner){
+        const t=bridgeTuner;
+        try{
+            const n=await R.call({ref:t.rec,method:'read',args:[{__ref:t.buf},0,t.n]});
+            if(!bridgeTuner)break;
+            if(typeof n==='number'&&n>0){
+                const parts=(await R.staticCall({class:'java.util.Arrays',method:'toString',args:[{__ref:t.buf}]})).slice(1,-1).split(', ');
+                const f=new Float32Array(n);
+                for(let i=0;i<n;i++)f[i]=parts[i]/32768;
+                showPitch(autoCorrelate(f,t.sr));
+            }
+        }catch(e){break}
+    }
+}
+async function stopTunerBridge(){
+    if(!bridgeTuner)return;
+    const t=bridgeTuner;bridgeTuner=null;
+    const R=Android.reflect;
+    try{await R.call({ref:t.rec,method:'stop'})}catch(_){}
+    try{await R.call({ref:t.rec,method:'release'})}catch(_){}
+    try{await R.release({ref:t.rec})}catch(_){}
+    try{await R.release({ref:t.buf})}catch(_){}
+}
 async function startTuner(){
     try{
         if(!await ensureMicPermission())throw new Error('permission');
-        audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-        analyser=audioCtx.createAnalyser();
-        analyser.fftSize=4096;
-        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-        audioCtx.createMediaStreamSource(stream).connect(analyser);
-        updatePitch();
+        try{
+            await startTunerWebAudio();
+        }catch(e){
+            if(window.Android&&Android.available)await startTunerBridge();
+            else throw e;
+        }
     }catch(e){
         M_toast('マイク使用許可が必要です');
         const btn=$('tuner-toggle-btn');btn.textContent='開始';btn.classList.remove('on');
     }
 }
+function stopTuner(){
+    if(audioCtx&&audioCtx.state!=='closed'){try{audioCtx.close()}catch(_){}}
+    audioCtx=null;analyser=null;
+    if(micStream){try{micStream.getTracks().forEach(tr=>tr.stop())}catch(_){}micStream=null}
+    cancelAnimationFrame(tunerRaf);
+    stopTunerBridge();
+}
 function toggleTuner(){
     const btn=$('tuner-toggle-btn');
-    if(audioCtx&&audioCtx.state!=='closed'){
-        audioCtx.close();cancelAnimationFrame(tunerRaf);
+    if((audioCtx&&audioCtx.state!=='closed')||bridgeTuner){
+        stopTuner();
         btn.textContent='開始';btn.classList.remove('on');
     }else{
         startTuner();
         btn.textContent='停止';btn.classList.add('on');
     }
 }
-function updatePitch(){
-    if(!analyser||!audioCtx)return;
-    const buf=new Float32Array(analyser.fftSize);
-    analyser.getFloatTimeDomainData(buf);
-    const freq=autoCorrelate(buf,audioCtx.sampleRate);
-    if(freq!==-1&&isFinite(freq)){
+function showPitch(freq){
+    if(freq!==-1&&isFinite(freq)&&freq>0){
         $('tuner-freq').textContent=Math.round(freq);
         const n=Math.round(12*Math.log2(freq/440)+69);
         $('tuner-note').textContent=getNoteLabel(n);
         const cents=1200*Math.log2(freq/(440*Math.pow(2,(n-69)/12)));
         $('tuner-needle').style.left=Math.max(0,Math.min(100,50+cents))+'%';
     }
+}
+function updatePitch(){
+    if(!analyser||!audioCtx)return;
+    const buf=new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(buf);
+    showPitch(autoCorrelate(buf,audioCtx.sampleRate));
     tunerRaf=requestAnimationFrame(updatePitch);
 }
 function autoCorrelate(buf,sr){
