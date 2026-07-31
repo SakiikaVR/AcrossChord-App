@@ -8,7 +8,7 @@
 
 <p align="center">
   サーバー不要・アカウント不要。データはすべて端末内に保存されます。
-  本体は<b>外部ライブラリ非依存の単一 HTML ファイル</b>で、
+  本体は<b>外部ライブラリ非依存の HTML + JavaScript</b> で、
   Android 用 APK は <a href="https://github.com/SakiikaVR/Sakiika-Builder">さきいかビルダー</a> でビルドしています。
 </p>
 
@@ -27,8 +27,8 @@
 
 | 環境 | 手順 |
 |---|---|
-| 🤖 **Android** | **[📦 最新リリース](https://github.com/SakiikaVR/AcrossChord-App/releases/latest)** から `AcrossChord-2.0.0.apk` をダウンロードして開き、インストール |
-| 🌐 **ブラウザ** | [index.html](index.html) をダウンロードしてブラウザで開くだけ |
+| 🤖 **Android** | **[📦 最新リリース](https://github.com/SakiikaVR/AcrossChord-App/releases/latest)** から `AcrossChord-x.x.x.apk` をダウンロードして開き、インストール |
+| 🌐 **ブラウザ** | リポジトリをダウンロード (Code → Download ZIP) して [index.html](index.html) をブラウザで開くだけ |
 
 > インストールもアカウントも不要。完全にオフラインで動作します。
 > マイク権限はクロマチックチューナー機能でのみ使用します。
@@ -45,7 +45,7 @@
 - 📜 **オートスクロール** — 速度調整つき。ズームは 50%–300%
 - 🎨 **テーマ切替** — ダーク / ライトテーマ、アクセントカラーの変更
 - 💾 **データ管理** — ライブラリを JSON でエクスポート / インポート (マージ)、全データ削除
-- 🚫 **依存ゼロ** — 単一 HTML・外部ライブラリなし・ビルド不要・通信なし
+- 🚫 **依存ゼロ** — 外部ライブラリなし・ビルド不要・通信なし
 
 ## ✏️ 記法の例
 
@@ -74,7 +74,10 @@
 
 ```
 AcrossChord-App/
-├── index.html     # アプリ本体 (単一ファイル・外部ライブラリ非依存)
+├── index.html     # アプリ本体 (HTML / CSS)
+├── js/
+│   ├── data.js    # 音楽理論データ (コードシェイプ・チューニングなど)
+│   └── app.js     # アプリケーションロジック
 ├── icons/
 │   └── icon.png   # アイコン (APK 用)
 └── sakiika.json   # さきいかビルダーのビルド設定 (Android 版)
@@ -114,8 +117,9 @@ APK を作り直すときは [さきいかビルダー](https://github.com/Sakii
 
 ```powershell
 # web ファイルをステージング (www/ は .gitignore 済み)
-New-Item -ItemType Directory -Force www | Out-Null
+New-Item -ItemType Directory -Force www\js | Out-Null
 Copy-Item index.html www\
+Copy-Item js\* www\js\
 
 sakiika build .\sakiika.json
 ```
