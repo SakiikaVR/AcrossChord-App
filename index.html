@@ -1,32 +1,32 @@
 <!DOCTYPE html>
 <!--
-  コードノート (Chord Note) × オンコミ デザイン
-  Functionality: AcrossChord-App (Chord Note) - Copyright (c) 2026 SakiikaVR / MIT License
-  Design:        ON-Comi (オンコミ)            - Copyright (c) SakiikaVR / MIT License
+  アクロスコード (AcrossChord) × オンコミ デザイン
+  Functionality: AcrossChord-App - Copyright (c) 2026 SakiikaVR / MIT License
+  Design:        ON-Comi (オンコミ) - Copyright (c) SakiikaVR / MIT License
   https://opensource.org/licenses/MIT
 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#f9f9fb">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>コードノート</title>
+<title>アクロスコード</title>
 <script>
-/* 保存済みテーマを最初の描画前に適用する。
-   load 後の applyTheme() 任せだと、ライトモード設定でも
-   CSS 既定のダーク配色で一瞬描画されてしまう。 */
-(function(){try{
-    if(localStorage.getItem('cv_theme')==='light'){
-        document.documentElement.setAttribute('data-theme','light');
-        var m=document.querySelector('meta[name="theme-color"]');
-        if(m)m.setAttribute('content','#f9f9fb');
-    }
+/* 保存済みテーマを最初の描画前に適用する (既定はライト)。
+   load 後の applyTheme() 任せだと、CSS 既定のダーク配色で
+   一瞬描画されてしまう。 */
+(function(){var t='light';try{
+    t=localStorage.getItem('cv_theme')||'light';
     var ACC={blue:'#7bb3d7',pink:'#f79ecd',red:'#ff453a',orange:'#ff9f0a'};
     var a=localStorage.getItem('cv_accent');
     if(a&&ACC[a])document.documentElement.style.setProperty('--primary-color',ACC[a]);
-}catch(e){}})();
+}catch(e){}
+    document.documentElement.setAttribute('data-theme',t);
+    var m=document.querySelector('meta[name="theme-color"]');
+    if(m)m.setAttribute('content',t==='light'?'#f9f9fb':'#000000');
+})();
 </script>
 <style>
 /* ============================================================
@@ -73,6 +73,13 @@ html[data-theme="light"] body { background-color: var(--bg-color); }
 html[data-theme="light"] #toast { background: rgba(40, 40, 44, 0.92); }
 html[data-theme="light"] .song-check { border-color: var(--card-bg); }
 html[data-theme="light"] .needle { box-shadow: 0 0 8px color-mix(in srgb, var(--primary-color) 45%, transparent); }
+/* ライトモードでは丸ボタンの背景を薄くする (グレーが濃く見えないように) */
+html[data-theme="light"] .back-btn,
+html[data-theme="light"] .round-tool-btn:not(.on),
+html[data-theme="light"] .modal-header button,
+html[data-theme="light"] .chord-popup-close {
+    background: rgba(118, 118, 128, 0.07);
+}
 html { transition: background-color 0.25s; }
 body, .page, .settings-card, .settings-row, .song-group, .list-row, .tuner-card,
 .modal-content, .ios-alert, .action-sheet-group, .chord-popup, .chord-diagram {
@@ -373,6 +380,8 @@ select.form-input { -webkit-appearance: none; appearance: none; }
     width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     font-weight: 800; font-size: 17px; color: #1c1c1e;
+    /* アクセントカラー基調・ライトモード仕様の配色で固定 (テーマに依存しない) */
+    background: color-mix(in srgb, var(--primary-color) 24%, #ffffff);
     box-shadow: var(--shadow-card);
 }
 .song-info { flex: 1; min-width: 0; }
@@ -386,10 +395,6 @@ select.form-input { -webkit-appearance: none; appearance: none; }
     animation: pop 0.15s ease;
 }
 .song-check svg { width: 13px; height: 13px; }
-/* 五十音インデックス色 (パステル) */
-.idx-a{background:#f6c5b4}.idx-k{background:#f0b9c4}.idx-s{background:#b8ddc6}.idx-t{background:#aed9dd}
-.idx-n{background:#b9d0ef}.idx-h{background:#cfc3ec}.idx-m{background:#e3cdbb}.idx-y{background:#c5cdd8}
-.idx-r{background:#efecf7}.idx-w{background:#b4c4cf}.idx-en{background:#e9e0ab}.idx-def{background:#d4d4d8}
 
 /* ---- Playlist rows (ON-Comi list-row) ---- */
 .list-collection { padding: 12px 20px 110px; display: flex; flex-direction: column; gap: 12px; }
@@ -454,7 +459,7 @@ body.hide-nav .bottom-nav { display: none; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ============================================================
-   コードノート機能用ビュー (オンコミデザインで再構成)
+   アクロスコード機能用ビュー (オンコミデザインで再構成)
    ============================================================ */
 
 /* ---- 曲詳細 (コード譜ビューア) ---- */
@@ -710,7 +715,7 @@ body.hide-nav .bottom-nav { display: none; }
 <div id="page-library" class="page active">
     <div class="sticky-header">
         <h1>
-            <span>コードノート</span>
+            <span>アクロスコード</span>
             <button class="icon-btn" id="add-song-btn" aria-label="新規作成">
                 <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
@@ -843,7 +848,7 @@ body.hide-nav .bottom-nav { display: none; }
             <h3>アプリ情報</h3>
             <div class="settings-card">
                 <div class="settings-row" style="cursor:default;">
-                    <div class="settings-label">コードノート<div class="settings-sub">v2.2.0 / MIT License — デザイン: オンコミ</div></div>
+                    <div class="settings-label">アクロスコード<div class="settings-sub">v2.2.1 / MIT License — デザイン: オンコミ</div></div>
                 </div>
             </div>
         </div>

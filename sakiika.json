@@ -1,8 +1,8 @@
 {
   "appName": "アクロスコード",
   "packageName": "com.sakiikavr.acrosschord",
-  "versionName": "2.2.0",
-  "versionCode": 7,
+  "versionName": "2.2.1",
+  "versionCode": 8,
   "webRoot": "www",
   "entry": "index.html",
   "outputFormat": "apk",

@@ -1,5 +1,5 @@
 /*!
- * コードノート (Chord Note) — アプリケーションロジック
+ * アクロスコード (AcrossChord) — アプリケーションロジック
  * Copyright (c) 2026 SakiikaVR / MIT License
  * デザイン: オンコミ (ON-Comi) / MIT License
  */
@@ -9,7 +9,7 @@
 let notationMode=localStorage.getItem('cv_notation')||'sharp';
 let tuningId=localStorage.getItem('cv_tuning')||'std'; if(!TUNINGS[tuningId])tuningId='std';
 let accentId=localStorage.getItem('cv_accent')||'blue'; if(!ACCENTS[accentId])accentId='blue';
-let themeId=localStorage.getItem('cv_theme')||'dark'; if(!THEMES[themeId])themeId='dark';
+let themeId=localStorage.getItem('cv_theme')||'light'; if(!THEMES[themeId])themeId='light';
 let diagramOn=localStorage.getItem('cv_diagram')!=='off'; // 既定で有効
 let songLibrary=[],playlists=[];
 let currentSongId=null,currentPlaylistId=null;
@@ -115,7 +115,6 @@ function restoreState(state){
 
 /* ============ 五十音インデックス ============ */
 function getIndexChar(str){if(!str)return'#';const c=str.charAt(0);if(/[ぁ-んァ-ン]/.test(c)){const h=c.replace(/[ァ-ン]/g,s=>String.fromCharCode(s.charCodeAt(0)-0x60));if(/[あ-お]/.test(h))return'あ';if(/[か-ご]/.test(h))return'か';if(/[さ-ぞ]/.test(h))return'さ';if(/[た-ど]/.test(h))return'た';if(/[な-の]/.test(h))return'な';if(/[は-ぽ]/.test(h))return'は';if(/[ま-も]/.test(h))return'ま';if(/[や-よ]/.test(h))return'や';if(/[ら-ろ]/.test(h))return'ら';if(/[わ-ん]/.test(h))return'わ';return'他'}if(/[a-zA-Z]/.test(c))return c.toUpperCase();return'#'}
-function getIndexColorClass(c){return {'あ':'idx-a','か':'idx-k','さ':'idx-s','た':'idx-t','な':'idx-n','は':'idx-h','ま':'idx-m','や':'idx-y','ら':'idx-r','わ':'idx-w'}[c]||(/[A-Z]/.test(c)?'idx-en':'idx-def')}
 
 /* ============ 曲リスト ============ */
 function renderSongList(filter=''){
@@ -153,7 +152,7 @@ function renderSongList(filter=''){
         const right=isSelectionMode
             ?(selectedSongIds.has(s.id)?`<div class="song-check">${SVG_CHECK}</div>`:'<div style="width:24px;"></div>')
             :`<div class="settings-chevron">${SVG_CHEVRON}</div>`;
-        li.innerHTML=`<div class="song-icon ${getIndexColorClass(idx)}">${icon}</div><div class="song-info"><div class="song-title-list">${escapeHTML(s.title)}</div><div class="song-artist-list">${escapeHTML(s.artist||'No Artist')}</div></div>${right}`;
+        li.innerHTML=`<div class="song-icon">${icon}</div><div class="song-info"><div class="song-title-list">${escapeHTML(s.title)}</div><div class="song-artist-list">${escapeHTML(s.artist||'No Artist')}</div></div>${right}`;
         card.appendChild(li);
     });
     if(card)c.appendChild(card);
@@ -714,8 +713,7 @@ function renderPlaylistSongs(pl){
         const li=document.createElement('div');
         li.className='song-item';
         li.onclick=()=>openSongDetail(s.id,true);
-        const iCls=getIndexColorClass(getIndexChar(s.title));
-        li.innerHTML=`<div class="song-icon ${iCls}">${escapeHTML((s.title||'?').charAt(0))}</div><div class="song-info"><div class="song-title-list">${escapeHTML(s.title)}</div><div class="song-artist-list">${escapeHTML(s.artist||'')}</div></div><button class="icon-btn pl-remove" style="color:var(--sub-text-color);" aria-label="削除"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg></button>`;
+        li.innerHTML=`<div class="song-icon">${escapeHTML((s.title||'?').charAt(0))}</div><div class="song-info"><div class="song-title-list">${escapeHTML(s.title)}</div><div class="song-artist-list">${escapeHTML(s.artist||'')}</div></div><button class="icon-btn pl-remove" style="color:var(--sub-text-color);" aria-label="削除"><svg viewBox="0 0 24 24" class="svg-icon" style="width:20px;height:20px;"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg></button>`;
         li.querySelector('.pl-remove').onclick=e=>{e.stopPropagation();removeSongFromPlaylist(pl.id,idx)};
         card.appendChild(li);
     });

@@ -1,5 +1,5 @@
 /*!
- * コードノート (Chord Note) — 音楽理論データ
+ * アクロスコード (AcrossChord) — 音楽理論データ
  * Copyright (c) 2026 SakiikaVR / MIT License
  */
 'use strict';
