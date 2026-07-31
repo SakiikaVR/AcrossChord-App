@@ -1,8 +1,8 @@
 {
   "appName": "アクロスコード",
   "packageName": "com.sakiikavr.acrosschord",
-  "versionName": "2.2.1",
-  "versionCode": 8,
+  "versionName": "2.2.2",
+  "versionCode": 9,
   "webRoot": "www",
   "entry": "index.html",
   "outputFormat": "apk",
@@ -18,7 +18,7 @@
   "lightBackground": "#f9f9fb",
   "darkBackground": "#000000",
   "iconPng": "icons/icon.png",
-  "iconBackground": "#121216",
+  "iconBackground": "#f9f9fb",
   "permissions": [
     "RECORD_AUDIO"
   ],
