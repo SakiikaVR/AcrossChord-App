@@ -11,6 +11,7 @@ let tuningId=localStorage.getItem('cv_tuning')||'std'; if(!TUNINGS[tuningId])tun
 let accentId=localStorage.getItem('cv_accent')||'blue'; if(!ACCENTS[accentId])accentId='blue';
 let themeId=localStorage.getItem('cv_theme')||'light'; if(!THEMES[themeId])themeId='light';
 let diagramOn=localStorage.getItem('cv_diagram')!=='off'; // 既定で有効
+let powerLowOnly=localStorage.getItem('cv_power_low')==='on'; // パワーコードを低音3弦 (6弦ルート) に固定
 let songLibrary=[],playlists=[];
 let currentSongId=null,currentPlaylistId=null;
 let isSelectionMode=false,isPlaylistSelectionMode=false;
@@ -440,9 +441,14 @@ function barreShape(rootIdx,sfx){
 }
 function getPowerChordShape(root,dropd){
     let idx=noteIndex(root);if(idx<0)return null;
-    if(dropd){const f6=(idx-2+12)%12,f5=(idx-9+12)%12;if(f6<=4||f6<f5)return[f6,f6,f6,-1,-1,-1];return f5===0?[-1,0,2,2,-1,-1]:[-1,f5,f5+2,f5+2,-1,-1]}
+    if(dropd){
+        const f6=(idx-2+12)%12,f5=(idx-9+12)%12;
+        if(powerLowOnly||f6<=4||f6<f5)return[f6,f6,f6,-1,-1,-1];
+        return f5===0?[-1,0,2,2,-1,-1]:[-1,f5,f5+2,f5+2,-1,-1];
+    }
     const f6=(idx-4+12)%12,f5=(idx-9+12)%12;
-    if(f6<=4||f6<f5)return f6===0?[0,2,2,-1,-1,-1]:[f6,f6+2,f6+2,-1,-1,-1];
+    // 「低音3弦のみ」設定時は常に6弦ルート (6・5・4弦) のフォームを使う
+    if(powerLowOnly||f6<=4||f6<f5)return f6===0?[0,2,2,-1,-1,-1]:[f6,f6+2,f6+2,-1,-1,-1];
     return f5===0?[-1,0,2,2,-1,-1]:[-1,f5,f5+2,f5+2,-1,-1];
 }
 function applyDropD(shape,raw){
@@ -514,11 +520,13 @@ function updateSettingsUI(){
     $('accent-value').textContent=ACCENTS[accentId].label;
     $('theme-value').textContent=THEMES[themeId].label;
     $('diagram-row').classList.toggle('selected',diagramOn);
+    $('power-low-row').classList.toggle('selected',powerLowOnly);
 }
 function updateModeUI(mode){document.querySelectorAll('#settings-sheet .settings-row[data-mode]').forEach(e=>e.classList.toggle('selected',e.dataset.mode===mode))}
 function openSettingsSheet(){if(!currentSongId){M_toast('曲を選択してください');return}$('settings-sheet').classList.add('show')}
 function closeSettingsSheet(){$('settings-sheet').classList.remove('show')}
 function toggleDiag(){diagramOn=!diagramOn;localStorage.setItem('cv_diagram',diagramOn?'on':'off');updateSettingsUI();if(currentSongId){const s=getSong(currentSongId);if(s)renderScore(s)}}
+function togglePowerLow(){powerLowOnly=!powerLowOnly;localStorage.setItem('cv_power_low',powerLowOnly?'on':'off');updateSettingsUI();if(currentSongId){const s=getSong(currentSongId);if(s)renderScore(s)}}
 function setMode(m){const s=getSong(currentSongId);if(!s)return;s.mode=m;saveLibrary();updateDetailView(s)}
 function setTuning(id){if(!TUNINGS[id])id='std';tuningId=id;localStorage.setItem('cv_tuning',id);updateTuningUI();if(currentSongId){const sg=getSong(currentSongId);if(sg)renderScore(sg)}}
 function renderTuningList(){
@@ -941,6 +949,7 @@ function init(){
         row.addEventListener('click',e=>{if(e.target.tagName==='SELECT')return;setMode(row.dataset.mode)});
     });
     $('diagram-row').onclick=toggleDiag;
+    $('power-low-row').onclick=togglePowerLow;
     $('key-row').onclick=pickKey;
     $('capo-row').onclick=pickCapo;
     $('sheet-close-btn').onclick=closeSettingsSheet;
