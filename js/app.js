@@ -591,34 +591,132 @@ async function pickCapo(){
 function updateKeyUI(key){const i=noteIndex(key);$('key-value').textContent=i>=0?keyLabel(i):String(key)}
 function updateCapoUI(capo){$('capo-value').textContent=capo===0?'0 (なし)':String(capo)}
 
-/* ============ データ管理 ============ */
-function exportData(){
-    const b=new Blob([JSON.stringify(songLibrary,null,2)],{type:'application/json'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(b);a.download='chord_library.json';a.click();
-    URL.revokeObjectURL(a.href);
-}
-function importData(input){
-    const file=input.files?.[0];if(!file)return;
-    const r=new FileReader();
-    r.onload=async e=>{
+/* ============ データ管理 (バックアップ) ============ */
+function hasBridge(){return !!(window.Android&&Android.available)}
+
+/* JSONファイルとして書き出す。
+   さきいかランタイムの実仕様 (ChoBoard で動作確認済みの API のみ使用):
+   - fs.createFile({name, mime, data, encoding}) … SAF の保存ダイアログ。data を渡すと作成と同時に書き込み。
+     キャンセル時は例外ではなく {ok:false, reason:"cancelled"} が返る。成功時は {ok:true, item:{uri,...}}
+   - SAF uri への書き込みは fs.writeUri({uri, data, encoding}) (fs.write は path 専用)
+   - 共有は fs.shareFile({path})、クリップボードは clipboard.write({text, label}) */
+async function exportData(){
+    const d=new Date(),z=n=>String(n).padStart(2,'0');
+    const payload={app:'acrosschord',version:2,exportedAt:d.toISOString(),songs:songLibrary,playlists};
+    const json=JSON.stringify(payload,null,2);
+    const fname=`acrosschord-backup-${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}.json`;
+    if(!(hasBridge()&&Android.fs)){
+        // ブラウザ / PWA (iOS 含む): Blob ダウンロード
         try{
-            const imp=JSON.parse(e.target.result);
-            const items=Array.isArray(imp)?imp:[imp];
-            if(!await iosConfirm('読み込みますか？',`${items.length}件のデータをライブラリに追加します。`,'追加'))return;
-            items.forEach(ns=>{
-                if(!ns||typeof ns!=='object')return;
-                if(!ns.id)ns.id='song_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-                if(!ns.title)ns.title='No Title';
-                if(!ns.content)ns.content='{title: No Title}\n{key: C}\n\n[C] ';
-                const i=songLibrary.findIndex(ex=>ex.id===ns.id);
-                i>=0?songLibrary[i]=ns:songLibrary.push(ns);
-            });
-            saveLibrary();renderSongList($('song-search').value);updateSongCount();M_toast('読み込み完了');
-        }catch(err){console.error(err);M_toast('JSONファイルの読み込みに失敗しました')}
-        finally{input.value=''}
-    };
-    r.readAsText(file);
+            const blob=new Blob([json],{type:'application/json'});
+            const a=document.createElement('a');
+            a.href=URL.createObjectURL(blob);a.download=fname;
+            document.body.appendChild(a);a.click();a.remove();
+            setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+            M_toast('バックアップを書き出しました');
+        }catch(e){console.warn('blobダウンロード失敗',e);showBackupText(json)}
+        return;
+    }
+    // 1) SAF「名前を付けて保存」— data 同時書き込み + 読み戻し検証
+    try{
+        const res=await Android.fs.createFile({name:fname,mime:'application/json',data:json,encoding:'utf8'});
+        if(res&&res.ok===false){M_toast('保存をキャンセルしました');return}
+        const item=(res&&res.item)||res||{};
+        const uri=item.uri;
+        let verified=Number(item.size)>0;
+        if(!verified&&uri){
+            try{verified=String(await Android.fs.readUri({uri,encoding:'utf8'})||'').length>0}catch(_){}
+            if(!verified){
+                try{
+                    await Android.fs.writeUri({uri,data:json,encoding:'utf8'});
+                    verified=String(await Android.fs.readUri({uri,encoding:'utf8'}).catch(()=>'')||'').length>0;
+                }catch(_){}
+            }
+        }
+        if(verified){M_toast('バックアップを保存しました');return}
+        console.warn('SAF保存を検証できず共有へフォールバック');
+    }catch(e){console.warn('createFile失敗',e)}
+    // 2) アプリ領域に書いて共有シートで任意の場所へ
+    try{
+        await Android.fs.write({path:fname,data:json,encoding:'utf8'});
+        const st=await Android.fs.stat({path:fname}).catch(()=>null);
+        if(!st||Number(st.size??1)>0){await Android.fs.shareFile({path:fname});return}
+    }catch(e){console.warn('shareFile失敗',e)}
+    // 3) クリップボード
+    try{await Android.clipboard.write({text:json,label:'acrosschord-backup'});M_toast('ファイル保存に対応していないため、クリップボードにコピーしました');return}catch(_){}
+    try{await Android.clipboard.set({text:json});M_toast('クリップボードにコピーしました');return}catch(_){}
+    // 4) 最終手段: 画面に表示して手動コピー (必ず成功する)
+    showBackupText(json);
+}
+function showBackupText(json){
+    $('backup-text').value=json;
+    $('backup-text-modal').classList.add('show');
+    M_toast('自動保存できないため文字列を表示しました。コピーして保存してください');
+}
+async function copyBackupText(){
+    const ta=$('backup-text');ta.focus();ta.select();
+    try{await navigator.clipboard.writeText(ta.value);M_toast('コピーしました');return}catch(_){}
+    try{document.execCommand('copy');M_toast('コピーしました')}catch(_){M_toast('テキストを長押しでコピーしてください')}
+}
+
+/* ---- インポート (ファイル選択 or 貼り付け) ---- */
+function openImportSheet(){
+    $('import-text').value='';
+    $('import-file').value='';
+    $('import-file-name').textContent='';
+    $('import-modal').classList.add('show');
+}
+function closeImportSheet(){$('import-modal').classList.remove('show')}
+function readFileText(f){
+    return new Promise((res,rej)=>{
+        const r=new FileReader();
+        r.onload=()=>res(String(r.result));
+        r.onerror=rej;
+        r.readAsText(f,'utf-8');
+    });
+}
+async function runImport(){
+    let text=$('import-text').value;
+    const f=$('import-file').files?.[0];
+    if(!text.trim()&&f){
+        try{text=await readFileText(f)}catch(e){console.error(e);M_toast('ファイルを読み込めませんでした');return}
+    }
+    if(!text.trim()){M_toast('ファイルを選択するか、バックアップ文字列を貼り付けてください');return}
+    await restoreBackup(text);
+}
+/* 新形式 {app,songs,playlists} / 旧形式 (曲配列・単曲) の両方を受け付ける */
+async function restoreBackup(text){
+    let data;
+    try{data=JSON.parse(text)}catch(e){M_toast('バックアップの形式が正しくありません');return}
+    let songs=[],lists=[];
+    if(Array.isArray(data))songs=data;
+    else if(data&&typeof data==='object'){
+        if(Array.isArray(data.songs))songs=data.songs;
+        if(Array.isArray(data.playlists))lists=data.playlists;
+        if(!songs.length&&!lists.length&&data.content)songs=[data];
+    }
+    songs=songs.filter(s=>s&&typeof s==='object');
+    lists=lists.filter(p=>p&&typeof p==='object'&&p.id);
+    if(!songs.length&&!lists.length){M_toast('読み込めるデータがありません');return}
+    const msg=`曲 ${songs.length} 件`+(lists.length?`・プレイリスト ${lists.length} 件`:'')+' を追加/更新します。';
+    if(!await iosConfirm('読み込みますか？',msg,'追加'))return;
+    songs.forEach(ns=>{
+        if(!ns.id)ns.id='song_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+        if(!ns.title)ns.title='No Title';
+        if(!ns.content)ns.content='{title: No Title}\n{key: C}\n\n[C] ';
+        const i=songLibrary.findIndex(ex=>ex.id===ns.id);
+        i>=0?songLibrary[i]=ns:songLibrary.push(ns);
+    });
+    lists.forEach(pl=>{
+        pl.title=pl.title||'プレイリスト';
+        pl.songs=Array.isArray(pl.songs)?pl.songs:[];
+        const i=playlists.findIndex(ex=>ex.id===pl.id);
+        i>=0?playlists[i]=pl:playlists.push(pl);
+    });
+    saveLibrary();savePlaylists();
+    renderSongList($('song-search').value);renderPlaylistCollection();updateSongCount();
+    closeImportSheet();
+    M_toast('読み込み完了');
 }
 async function resetAllData(){
     if(!await iosConfirm('全データを削除しますか？','曲・プレイリスト・設定をすべて消去します。この操作は取り消せません。','削除',true))return;
@@ -970,9 +1068,23 @@ function init(){
     $('theme-row').onclick=pickTheme;
     $('accent-row').onclick=pickAccent;
     $('export-row').onclick=exportData;
-    $('import-row').onclick=()=>$('import-file').click();
-    $('import-file').addEventListener('change',e=>importData(e.target));
+    $('import-row').onclick=openImportSheet;
+    $('import-file-btn').onclick=()=>$('import-file').click();
+    $('import-file').addEventListener('change',()=>{
+        const f=$('import-file').files?.[0];
+        $('import-file-name').textContent=f?`「${f.name}」を選択しました`:'';
+    });
+    $('import-go-btn').onclick=runImport;
+    $('import-close-btn').onclick=closeImportSheet;
+    $('import-modal').addEventListener('click',e=>{if(e.target===$('import-modal'))closeImportSheet()});
+    $('backup-copy-btn').onclick=copyBackupText;
+    $('backup-text-close-btn').onclick=()=>$('backup-text-modal').classList.remove('show');
     $('reset-row').onclick=resetAllData;
+
+    /* PWA: Service Worker (https で配信されるブラウザ/PWA のみ。APK 内 file:// では登録しない) */
+    if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
+        navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    }
 
     /* チューナー */
     $('tuner-toggle-btn').onclick=toggleTuner;

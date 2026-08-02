@@ -1,0 +1,17 @@
+{
+  "name": "アクロスコード",
+  "short_name": "アクロスコード",
+  "description": "コード譜の作成・閲覧からギターチューナーまで、これ 1 つのコード譜アプリ",
+  "lang": "ja",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f9f9fb",
+  "theme_color": "#f9f9fb",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

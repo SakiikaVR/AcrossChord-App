@@ -28,7 +28,8 @@
 | 環境 | 手順 |
 |---|---|
 | 🤖 **Android** | **[📦 最新リリース](https://github.com/SakiikaVR/AcrossChord-App/releases/latest)** から `AcrossChord-x.x.x.apk` をダウンロードして開き、インストール |
-| 🌐 **ブラウザ** | リポジトリをダウンロード (Code → Download ZIP) して [index.html](index.html) をブラウザで開くだけ |
+| 🍎 **iOS / ブラウザ (PWA)** | **<https://sakiikavr.github.io/AcrossChord-App/>** を開く。iOS Safari は共有メニュー →「ホーム画面に追加」でアプリとして使えます (オフライン対応) |
+| 🌐 **ローカル** | リポジトリをダウンロード (Code → Download ZIP) して [index.html](index.html) をブラウザで開くだけ |
 
 > インストールもアカウントも不要。完全にオフラインで動作します。
 > マイク権限はクロマチックチューナー機能でのみ使用します。
@@ -44,7 +45,8 @@
 - 🎤 **クロマチックチューナー** — マイク入力から自己相関法でピッチを検出し、音名・周波数・セント単位のズレをメーター表示
 - 📜 **オートスクロール** — 速度調整つき。ズームは 50%–300%
 - 🎨 **テーマ切替** — ダーク / ライトテーマ、アクセントカラーの変更
-- 💾 **データ管理** — ライブラリを JSON でエクスポート / インポート (マージ)、全データ削除
+- 💾 **データ管理** — 曲とプレイリストを JSON でバックアップ / 復元 (マージ)。Android 版は保存ダイアログ→共有→クリップボードの多段フォールバックで確実に書き出し、復元はファイル選択と文字列貼り付けの両対応
+- 📱 **PWA 対応** — GitHub Pages 版はホーム画面に追加してオフラインでも起動可能 (iOS / Android / PC)
 - 🚫 **依存ゼロ** — 外部ライブラリなし・ビルド不要・通信なし
 
 ## ✏️ 記法の例
@@ -74,13 +76,16 @@
 
 ```
 AcrossChord-App/
-├── index.html     # アプリ本体 (HTML / CSS)
+├── index.html            # アプリ本体 (HTML / CSS)
 ├── js/
-│   ├── data.js    # 音楽理論データ (コードシェイプ・チューニングなど)
-│   └── app.js     # アプリケーションロジック
+│   ├── data.js           # 音楽理論データ (コードシェイプ・チューニングなど)
+│   └── app.js            # アプリケーションロジック
+├── manifest.webmanifest  # PWA マニフェスト
+├── sw.js                 # Service Worker (オフラインキャッシュ)
 ├── icons/
-│   └── icon.png   # アイコン (APK 用)
-└── sakiika.json   # さきいかビルダーのビルド設定 (Android 版)
+│   ├── icon.png          # アイコン 512px (APK / PWA 用)
+│   └── icon-192.png      # アイコン 192px (PWA 用)
+└── sakiika.json          # さきいかビルダーのビルド設定 (Android 版)
 ```
 
 ## ❓ トラブルシューティング
@@ -117,9 +122,10 @@ APK を作り直すときは [さきいかビルダー](https://github.com/Sakii
 
 ```powershell
 # web ファイルをステージング (www/ は .gitignore 済み)
-New-Item -ItemType Directory -Force www\js | Out-Null
-Copy-Item index.html www\
+New-Item -ItemType Directory -Force www\js, www\icons | Out-Null
+Copy-Item index.html, manifest.webmanifest, sw.js www\
 Copy-Item js\* www\js\
+Copy-Item icons\* www\icons\
 
 sakiika build .\sakiika.json
 ```
