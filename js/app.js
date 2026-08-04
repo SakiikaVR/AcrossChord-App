@@ -252,11 +252,43 @@ function noteIndex(n){let i=NOTES.indexOf(n);if(i<0)i=NOTES_FLAT.indexOf(n);if(i
 function getNoteLabel(i){i=((i%12)+12)%12;return notationMode==='sharp'?NOTES[i]:NOTES_FLAT[i]}
 function convertNoteNotation(n){let i=noteIndex(n);return i>=0?getNoteLabel(i):n}
 function transposeNote(note,semitones){let i=noteIndex(note);return i<0?note:getNoteLabel(i+semitones)}
-function parseChordParts(c){const m=String(c).match(/^([A-G](?:#|b)?)(.*)$/);return m?{root:m[1],suffix:m[2]}:{root:c,suffix:''}}
+/* 全角・Unicodeの臨時記号や小文字ルートを、解析前に一つの形式へ揃える。 */
+function normalizeChordText(value){
+    let text=String(value??'').trim();
+    if(text.normalize)text=text.normalize('NFKC');
+    return text.replace(/[♯＃]/g,'#').replace(/[♭]/g,'b').replace(/[−–—]/g,'-');
+}
+function parseChordParts(c){
+    const text=normalizeChordText(c);
+    const m=text.match(/^([A-Ga-g])([#b]?)(.*)$/);
+    if(!m)return {root:text,suffix:''};
+    // Cblk の b はフラット記号ではなく、品質名 blk の先頭。
+    if(m[2]==='b'&&/^lk/i.test(m[3]))return {root:m[1].toUpperCase(),suffix:'b'+m[3]};
+    return {root:m[1].toUpperCase()+m[2],suffix:m[3]};
+}
+/* 末尾が音名の /G# または onG# だけをベース音として扱う。
+   C6/9 の /9 をオンコードと誤認しないための共通パーサー。 */
+function parseChordSymbol(value){
+    const p=parseChordParts(value);
+    if(noteIndex(p.root)<0)return null;
+    let suffix=p.suffix,bass='',bassSeparator='/';
+    const bm=suffix.match(/(\/|on)([A-Ga-g](?:#|b)?)$/i);
+    if(bm){
+        bass=bm[2].charAt(0).toUpperCase()+bm[2].slice(1);
+        bassSeparator=bm[1];
+        suffix=suffix.slice(0,-bm[0].length);
+    }
+    return {root:p.root,suffix,bass,bassSeparator};
+}
 function getRelativeMinor(note){let i=noteIndex(note);return i<0?'?m':getNoteLabel(i+9)+'m'}
 /* コード名全体 (オンコードのベース音も含む) を移調する。
    例: transposeChordName('Cm7/F',-2) → 'Bbm7/Eb' 相当 */
-function transposeChordName(name,semi){return String(name).replace(/[A-G](?:#|b)?/g,n=>transposeNote(n,semi))}
+function transposeChordName(name,semi){
+    const p=parseChordSymbol(name);
+    if(!p)return normalizeChordText(name);
+    const bass=p.bass?p.bassSeparator+transposeNote(p.bass,semi):'';
+    return transposeNote(p.root,semi)+p.suffix+bass;
+}
 /* 「(Bbadd9)」「C7↓」のような括弧書き・矢印付き表記を分解する (ChordWiki 互換) */
 function splitChordDecoration(tok){
     let core=String(tok),pre='',post='';
@@ -290,7 +322,8 @@ function renderScore(s){
         if(tr===''){html+='<div style="height:14px"></div>';return;}
         if(!line.includes('[')){html+=`<div class="score-line-normal">${escapeHTML(line)}</div>`;return;}
         const mode=(s.mode==='diagram')?'text':(s.mode||'text');
-        const diag=diagramOn;
+        // NNS は設定値にかかわらず、図と図用の空白を一切作らない。
+        const diag=diagramOn&&mode!=='nns';
         let row='<div class="score-row">';
         let remaining=line;
         const first=remaining.indexOf('[');
@@ -303,9 +336,16 @@ function renderScore(s){
             const token=m[1],text=m[2];
             const d=splitChordDecoration(token);
             const p=parseChordParts(d.core);
+            if(mode==='nns'){
+                const direct=getDirectNnsHTML(d.core);
+                if(direct){
+                    row+=createNnsSegment(d.pre+direct+d.post,text);
+                    continue;
+                }
+            }
             // コードとして読めないもの (小節線・記号・N.C. など) はグレー表示
             if(isNonChord(token)||noteIndex(p.root)<0){
-                if(diag&&mode!=='nns') row+=`<div class="chord-segment"><div class="segment-chord seg-nc-diag">${escapeHTML(token)}</div><div class="segment-text">${escapeHTML(text)}</div></div>`;
+                if(diag) row+=`<div class="chord-segment"><div class="segment-chord seg-nc-diag">${escapeHTML(token)}</div><div class="segment-text">${escapeHTML(text)}</div></div>`;
                 else row+=`<div class="chord-segment"><span class="chord-name nc">${escapeHTML(token)}</span><div class="segment-text">${escapeHTML(text)}</div></div>`;
                 continue;
             }
@@ -313,7 +353,7 @@ function renderScore(s){
             const played=transposeChordName(d.core,-capo);
             if(mode==='nns'){
                 const degree=getDegreeHTML(played,transposeNote(s.key||'C',-capo));
-                row+=`<div class="chord-segment"><div class="nns-text-container">${degree}</div><div class="segment-text">${escapeHTML(text)}</div></div>`;
+                row+=createNnsSegment(escapeHTML(d.pre)+degree+escapeHTML(d.post),text);
             }else{
                 const shown=(mode==='power')?parseChordParts(played).root+'5':d.pre+played+d.post;
                 if(diag) row+=createSegment(generateChordSvg(played,shown,mode),text);
@@ -326,42 +366,97 @@ function renderScore(s){
 }
 function isNonChord(str){return /^[|\-<>○\s←→↑↓]+$/.test(str)||['N.C.','NC'].includes(str)||/[゠-ヿ｠-ﾟ]/.test(str)}
 function createSegment(svg,text){return svg?`<div class="chord-segment"><div class="segment-chord">${svg}</div><div class="segment-text">${escapeHTML(text)}</div></div>`:`<div class="chord-segment"><div class="segment-chord" style="height:56px;width:0"></div><div class="segment-text">${escapeHTML(text)}</div></div>`}
-function getDegreeHTML(raw,key){
-    const m=raw.replace('on','/').match(/^([A-G](?:#|b)?)([^/]*)(?:\/(.*))?/);
-    if(!m)return escapeHTML(raw);
-    const keyIdx=noteIndex(key),rootIdx=noteIndex(m[1]);
-    if(keyIdx<0||rootIdx<0)return escapeHTML(raw);
-    let qual=(m[2]||'').replace(/^maj$/,'').replace(/^min$/,'m').replace(/^maj7$/,'M7').replace(/^m7b5|m7\(-5\)|m7\(b5\)$/,'m7-5').replace(/^m9$/,'m7(9)').replace(/^9$/,'7(9)');
-    if(qual.startsWith('m')&&qual!=='m7-5')qual=qual.replace(/^m/,'-');
-    qual=qual.replace('M7','△7').replace('aug','+').replace('dim','°');
-    const rootDeg=getDegreeLabel(rootIdx,keyIdx);
-    let html=`<span class="cn-root">${rootDeg}</span>`;
-    if(qual)html+=`<sup class="cn-qual">${escapeHTML(qual)}</sup>`;
-    if(m[3]){const bi=noteIndex(m[3]);if(bi>=0)html+=`<span class="cn-slash">/</span><span class="cn-bass">${getDegreeLabel(bi,keyIdx)}</span>`}
+function createNnsSegment(nns,text){return `<div class="chord-segment"><div class="nns-text-container">${nns}</div><div class="segment-text">${escapeHTML(text)}</div></div>`}
+/* NNSで使う品質記号を統一する。未知の記号は捨てず、そのまま残す。 */
+function normalizeNnsQuality(value){
+    let q=normalizeChordText(value).replace(/\s+/g,'');
+    if(!q)return '';
+    q=q.replace(/^minor/i,'min').replace(/^major/i,'maj').replace(/^min(?=$|M|maj|△|\d|add|sus)/i,'m');
+    q=q.replace(/^m(?:M|maj|△)7/i,'-△7');
+    q=q.replace(/^M7/,'△7').replace(/^maj7/i,'△7').replace(/^maj(?=$)/i,'');
+    if(/^m(?=$|\d|add|sus|omit|blk)/.test(q))q='-'+q.slice(1);
+    if(/^(?:6\/?9|69|\(6\/?9\))$/.test(q))q='(69)';
+    q=q.replace(/^aug/i,'(5#)').replace(/^dim/i,'dim');
+    q=q.replace(/\(([#b])(\d+)\)/g,(_,acc,n)=>acc==='#'?`(${n}#)`:`(-${n})`);
+    q=q.replace(/([#b])(\d+)/g,(_,acc,n)=>acc==='#'?`(${n}#)`:`(-${n})`);
+    q=q.replace(/\((\d+)b\)/g,'(-$1)').replace(/(\d+)b/g,'(-$1)');
+    return q;
+}
+function buildNnsHTML(root,quality,bass=''){
+    let html=`<span class="cn-root">${escapeHTML(root)}</span>`;
+    if(quality)html+=`<sup class="cn-qual">${escapeHTML(quality)}</sup>`;
+    if(bass)html+=`<span class="cn-slash">/</span><span class="cn-bass">${escapeHTML(bass)}</span>`;
     return html;
+}
+/* [2△7] や [7sus4add9] のように、NNSを直接入力した譜面も受け付ける。 */
+function getDirectNnsHTML(raw){
+    const text=normalizeChordText(raw).replace(/\s+/g,'');
+    const m=text.match(/^([1-7])([#b]?)(.*?)(?:\/([1-7])([#b]?))?$/);
+    if(!m)return '';
+    return buildNnsHTML(m[1]+m[2],normalizeNnsQuality(m[3]),m[4]?m[4]+m[5]:'');
+}
+function getDegreeHTML(raw,key){
+    const chord=parseChordSymbol(raw);
+    if(!chord)return escapeHTML(raw);
+    const keyIdx=noteIndex(key),rootIdx=noteIndex(chord.root);
+    if(keyIdx<0||rootIdx<0)return escapeHTML(raw);
+    const rootDeg=getDegreeLabel(rootIdx,keyIdx);
+    const bi=chord.bass?noteIndex(chord.bass):-1;
+    return buildNnsHTML(rootDeg,normalizeNnsQuality(chord.suffix),bi>=0?getDegreeLabel(bi,keyIdx):'');
 }
 function getDegreeLabel(note,key){const labels=notationMode==='flat'?MajorDegrees.flat:MajorDegrees.sharp;return labels[(note-key+12)%12]}
 
 /* ============ コードダイアグラム SVG ============ */
+const chordSvgCache=new Map();
+const CHORD_SVG_CACHE_LIMIT=512;
+function normalizeChordShape(shape){
+    if(!Array.isArray(shape)||shape.length!==6)return null;
+    const normalized=shape.map(f=>f==null?-1:Number(f));
+    if(normalized.some(f=>!Number.isInteger(f)||f< -1||f>36))return null;
+    return normalized.some(f=>f>=0)?normalized:null;
+}
+function cacheChordSvg(key,svg){
+    if(chordSvgCache.size>=CHORD_SVG_CACHE_LIMIT)chordSvgCache.delete(chordSvgCache.keys().next().value);
+    chordSvgCache.set(key,svg);
+    return svg;
+}
+function chordDiagramLabel(display){
+    return normalizeChordText(display).replace(/([A-G])b/g,'$1♭').replace(/b(?=\d)/g,'♭');
+}
 function generateChordSvg(raw,display,mode){
+    // NNSからは、呼び出し側に不具合があっても絶対に図を返さない。
+    if(mode==='nns')return '';
     const t=TUNINGS[tuningId]||TUNINGS.std;
+    const cacheKey=[normalizeChordText(raw),normalizeChordText(display),mode,tuningId,powerLowOnly?'low':'auto'].join('|');
+    if(chordSvgCache.has(cacheKey))return chordSvgCache.get(cacheKey);
     let shape=null;
-    if(mode==='power'&&display.endsWith('5')){
-        const r=parseChordParts(display).root,idx=noteIndex(r);
+    if(mode==='power'){
+        const r=parseChordParts(raw).root,idx=noteIndex(r);
         if(idx>=0)shape=getPowerChordShape(NOTES[(idx+t.shift)%12],t.drop);
     }
-    if(!shape){
-        let raw2=raw;
-        if(t.shift){const p=parseChordParts(raw),r2=transposeNote(p.root,t.shift);if(r2)raw2=r2+p.suffix}
+    shape=normalizeChordShape(shape);
+    if(!shape&&mode!=='power'){
+        const raw2=t.shift?transposeChordName(raw,t.shift):normalizeChordText(raw);
         shape=getChordShape(raw2);
         if(shape&&t.drop)shape=applyDropD(shape,raw2);
+        shape=normalizeChordShape(shape);
+        // 未知の複合サフィックスでも、ルートの基本形まで必ずフォールバックする。
+        if(!shape){
+            const symbol=parseChordSymbol(raw2),idx=symbol?noteIndex(symbol.root):-1;
+            if(idx>=0){
+                shape=barreShape(idx,'')||getPowerChordShape(NOTES[idx],t.drop);
+                if(shape&&t.drop&&symbol)shape=applyDropD(shape,raw2);
+                shape=normalizeChordShape(shape);
+            }
+        }
     }
-    if(!shape)shape=[-1,-1,-1,-1,-1,-1];
+    // 有効なコードなら上で必ず到達する。最後の安全網も「全ミュート」にはしない。
+    if(!shape)shape=[-1,3,2,0,1,0];
     const w=64,h=56,mt=16,mr=10,mb=8,ml=10,gw=w-ml-mr,gh=h-mt-mb,strings=6,frets=4,sg=gh/(strings-1),fg=gw/frets;
     const vals=shape.filter(f=>f>0),min=vals.length?Math.min(...vals):0,max=vals.length?Math.max(...vals):0,base=max>4?min:1;
     const INK=diagInk();
-    const fs=display.length>7?9:display.length>4?10:display.length>2?11:12;
-    let svg=`<text x="${w/2}" y="${mt/2+2}" font-family="Arial" font-weight="900" font-size="${fs}px" text-anchor="middle" dominant-baseline="central" fill="${INK}">${escapeHTML(display).replace(/b/g,'♭')}</text>`;
+    const label=chordDiagramLabel(display),fs=label.length>9?8:label.length>7?9:label.length>4?10:label.length>2?11:12;
+    let svg=`<text x="${w/2}" y="${mt/2+2}" font-family="Arial, sans-serif" font-weight="900" font-size="${fs}px" text-anchor="middle" dominant-baseline="central" fill="${INK}">${escapeHTML(label)}</text>`;
     for(let i=0;i<strings;i++){const y=Math.round(mt+i*sg);svg+=`<line x1="${ml}" y1="${y}" x2="${ml+gw}" y2="${y}" stroke="${INK}" stroke-width="1"/>`}
     for(let i=0;i<=frets;i++){const x=Math.round(ml+i*fg);svg+=`<line x1="${x}" y1="${mt}" x2="${x}" y2="${mt+gh}" stroke="${INK}" stroke-width="${i===0&&base===1?2:1}"/>`}
     if(base>1)svg+=`<text x="${ml}" y="${h-4}" font-family="serif" font-weight="bold" font-size="11" text-anchor="middle" dominant-baseline="central" fill="${INK}">${base}</text>`;
@@ -373,34 +468,38 @@ function generateChordSvg(raw,display,mode){
         }else if(f===0)svg+=`<circle cx="${ml/2}" cy="${cy}" r="1.8" stroke="${INK}" fill="none"/>`;
         else svg+=`<line x1="${ml/2-2}" y1="${cy-2}" x2="${ml/2+2}" y2="${cy+2}" stroke="${INK}"/><line x1="${ml/2+2}" y1="${cy-2}" x2="${ml/2-2}" y2="${cy+2}" stroke="${INK}"/>`;
     });
-    return `<svg width="64" height="56" viewBox="0 0 64 56" class="chord-diagram">${svg}</svg>`;
+    const aria=escapeHTML(`${label} コードダイアグラム`);
+    return cacheChordSvg(cacheKey,`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="56" viewBox="0 0 64 56" preserveAspectRatio="xMidYMid meet" class="chord-diagram" role="img" aria-label="${aria}" focusable="false">${svg}</svg>`);
 }
 /* コード名から押さえ方を求める。
    1. CHORD_SHAPES の完全一致
    2. オンコードのベース音・テンション括弧を外した基本形
    3. サフィックスを段階的に簡略化しながら CHORD_SHAPES → バレー基本形の順で探す */
 function getChordShape(chord){
-    if(CHORD_SHAPES[chord])return CHORD_SHAPES[chord];
-    const p=parseChordParts(chord);
-    const ri=noteIndex(p.root);
+    const normalized=normalizeChordText(chord);
+    if(CHORD_SHAPES[normalized])return CHORD_SHAPES[normalized];
+    const symbol=parseChordSymbol(normalized);
+    if(!symbol)return null;
+    const ri=noteIndex(symbol.root);
     if(ri<0)return null;
-    const sfx=p.suffix
-        .replace(/(?:\/|on(?=[A-G]))[A-G](?:#|b)?.*$/,'')   // オンコードのベース音は基本形で代用
+    const sfx=symbol.suffix
         .replace(/\((?:maj7|M7)\)/i,'M7')                    // m(maj7) → mM7
         .replace(/\((?:b5|-5)\)/,'-5')                       // m7(b5) → m7-5
         .replace(/\([^)]*\)/g,'');                           // その他テンション括弧は除去
     for(const cand of suffixCandidates(sfx)){
-        const hit=CHORD_SHAPES[p.root+cand]
-            ||(ENHARMONIC[p.root]?CHORD_SHAPES[ENHARMONIC[p.root]+cand]:null)
+        const hit=CHORD_SHAPES[symbol.root+cand]
+            ||(ENHARMONIC[symbol.root]?CHORD_SHAPES[ENHARMONIC[symbol.root]+cand]:null)
             ||barreShape(ri,cand);
         if(hit)return hit;
     }
-    return CHORD_SHAPES[p.root]||(ENHARMONIC[p.root]?CHORD_SHAPES[ENHARMONIC[p.root]]:null)||null;
+    return CHORD_SHAPES[symbol.root]
+        ||(ENHARMONIC[symbol.root]?CHORD_SHAPES[ENHARMONIC[symbol.root]]:null)
+        ||barreShape(ri,'')||null;
 }
 /* 未知のサフィックスを近い基本形へ段階的に簡略化した候補リストを返す */
 function suffixCandidates(sfx){
     const out=[],push=v=>{if(v!=null&&!out.includes(v))out.push(v)};
-    const s=String(sfx).replace(/maj/gi,'M').replace(/△/g,'M');
+    const s=String(sfx).replace(/^-(?=△|M|maj|\d|add|sus)/,'m').replace(/maj/gi,'M').replace(/△/g,'M');
     push(sfx);push(s);
     if(/^mM7/.test(s)){push('mM7');push('m')}
     else if(/^m/.test(s)){ // 小文字 m = マイナー系 (maj は既に M へ正規化済み)
@@ -464,9 +563,12 @@ let popupChord=null;
 function showChordPopup(chord,shown){
     const p=$('chord-popup');
     if(popupChord===chord&&p.classList.contains('show')){closeChordPopup();return}
-    popupChord=chord;
     let mode=getSong(currentSongId)?.mode||'text';if(mode==='diagram')mode='text';
-    $('chord-popup-body').innerHTML=generateChordSvg(chord,shown,mode);
+    if(mode==='nns'){closeChordPopup();return}
+    const svg=generateChordSvg(chord,shown,mode);
+    if(!svg){closeChordPopup();return}
+    popupChord=chord;
+    $('chord-popup-body').innerHTML=svg;
     p.classList.add('show');
     document.querySelectorAll('.chord-name').forEach(e=>e.classList.toggle('playing',e.dataset.chord===chord));
 }

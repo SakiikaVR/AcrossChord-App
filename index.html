@@ -524,7 +524,7 @@ body.hide-nav .bottom-nav { display: none; }
 .score-row { display: flex; flex-wrap: wrap; align-items: flex-end; margin: 0 0 20px; min-height: 1.6em; }
 .score-line-normal { margin-bottom: 12px; line-height: 1.7; white-space: pre-wrap; }
 .chord-segment { display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; flex: 0 0 auto; vertical-align: bottom; max-width: 100%; }
-.segment-chord { margin-bottom: 4px; display: block; }
+.segment-chord { margin-bottom: 4px; display: block; min-height: 52px; flex: 0 0 auto; }
 /* 長い歌詞・記号はセグメント内で折り返す (画面外に見切れないように) */
 .segment-text { line-height: 1.5; min-height: 1.5em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chord-name {
@@ -536,7 +536,8 @@ body.hide-nav .bottom-nav { display: none; }
 .chord-name.nc { color: var(--sub-text-color); font-weight: 400; cursor: default; }
 .chord-diagram {
     /* テーマに依存しない固定色 (ダークモードでも反転させない) */
-    width: 58px; height: 52px; background: #ffffff;
+    display: block; width: 58px; height: 52px; min-width: 54px; min-height: 50px;
+    flex: 0 0 auto; overflow: visible; background: #ffffff;
     border-radius: 5px; border: 1px solid rgba(60, 60, 67, 0.16);
 }
 .nns-text-container { line-height: 1.2; white-space: nowrap; margin-bottom: 4px; font-weight: 700; }
@@ -857,7 +858,7 @@ body.hide-nav .bottom-nav { display: none; }
             <h3>アプリ情報</h3>
             <div class="settings-card">
                 <div class="settings-row" style="cursor:default;">
-                    <div class="settings-label">アクロスコード<div class="settings-sub">v2.3.0 / MIT License — デザイン: オンコミ</div></div>
+                    <div class="settings-label">アクロスコード<div class="settings-sub">v2.4.0 / MIT License — デザイン: オンコミ</div></div>
                 </div>
             </div>
         </div>
