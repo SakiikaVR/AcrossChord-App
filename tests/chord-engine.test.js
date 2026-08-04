@@ -26,6 +26,20 @@ ${app.slice(start,end)}
 const run=code=>vm.runInContext(code,context);
 const plain=html=>String(html).replace(/<[^>]+>/g,'');
 
+assert.doesNotMatch(app,/artist\|a\|subtitle\|st/,'subtitleをartistとして保存しない');
+
+const duplicateSong={mode:'text',capo:0,key:'C',artist:'歌： DOES　作詞・作曲： 氏原ワタル',content:'{subtitle: 歌: DOES 作詞・作曲: 氏原ワタル}\n{st:歌：  DOES  作詞・作曲：  氏原ワタル}\n[C]test'};
+run(`renderScore(${JSON.stringify(duplicateSong)})`);
+const dedupedSubtitle=run(`__nodes['score-output'].innerHTML`);
+assert.equal((dedupedSubtitle.match(/class="meta-block"/g)||[]).length,1,'同じsubtitleは一度だけ表示する');
+assert.doesNotMatch(dedupedSubtitle,/score-artist-line/,'subtitleと同じ旧artist表示を抑止する');
+
+const distinctSong={mode:'text',capo:0,key:'C',artist:'DOES',content:'{subtitle:作詞・作曲：氏原ワタル}\n[C]test'};
+run(`renderScore(${JSON.stringify(distinctSong)})`);
+const distinctMetadata=run(`__nodes['score-output'].innerHTML`);
+assert.equal((distinctMetadata.match(/score-artist-line/g)||[]).length,1,'異なるartistは維持する');
+assert.equal((distinctMetadata.match(/class="meta-block"/g)||[]).length,1,'異なるsubtitleは維持する');
+
 assert.deepEqual(
     JSON.parse(run(`JSON.stringify(parseChordSymbol('C6/9'))`)),
     {root:'C',suffix:'6/9',bass:'',bassSeparator:'/'}

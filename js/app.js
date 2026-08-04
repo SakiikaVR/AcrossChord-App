@@ -236,7 +236,8 @@ function saveCurrentSong(){
     const raw=$('edit-source').value;
     s.content=raw;
     s.title=(raw.match(/\{(?:title|t):\s*(.*?)\}/i)?.[1]||s.title||'No Title').trim();
-    s.artist=(raw.match(/\{(?:artist|a|subtitle|st):\s*(.*?)\}/i)?.[1]||s.artist||'').trim();
+    // subtitle は本文用の補足情報。artist へ代入すると描画時に二重表示になる。
+    s.artist=(raw.match(/\{(?:artist|a):\s*(.*?)\}/i)?.[1]||s.artist||'').trim();
     let key=(raw.match(/\{(?:key|k):\s*(.*?)\}/i)?.[1]||s.key||'C').trim();
     if(key.endsWith('m')){const root=key.slice(0,-1);let idx=noteIndex(root);if(idx>=0)key=NOTES[(idx+3)%12]}
     s.key=key;
@@ -302,20 +303,35 @@ function splitChordDecoration(tok){
     return {pre,core,post};
 }
 
+function normalizeMetaIdentity(value){
+    let text=String(value??'').trim();
+    if(text.normalize)text=text.normalize('NFKC');
+    return text.replace(/\s+/g,' ');
+}
+
 /* ============ コード譜レンダリング ============ */
 function renderScore(s){
     closeChordPopup();
     const out=$('score-output');
     const capo=s.capo||0;
-    const artist=escapeHTML(s.artist||'');
-    let html=artist?`<div class="score-artist-line">${artist}</div>`:'';
-    String(s.content||'').split('\n').forEach(line=>{
+    const lines=String(s.content||'').split('\n');
+    const artistRaw=String(s.artist||'').trim(),artistKey=normalizeMetaIdentity(artistRaw);
+    const subtitleKeys=new Set(lines.map(line=>line.trim().match(/^\{(?:subtitle|st):\s*(.*?)\}$/i)?.[1]).filter(v=>v!=null).map(normalizeMetaIdentity));
+    // 旧データではsubtitleがartistにも保存されている場合がある。その場で重複を抑止する。
+    let html=artistRaw&&!subtitleKeys.has(artistKey)?`<div class="score-artist-line">${escapeHTML(artistRaw)}</div>`:'';
+    const renderedSubtitleKeys=new Set();
+    lines.forEach(line=>{
         const tr=line.trim();
         if(tr.startsWith('{')&&tr.endsWith('}')){
             const inner=tr.slice(1,-1);
+            const subtitle=inner.match(/^(?:subtitle|st):\s*(.*)$/i);
             if(/^(c|comment):/i.test(inner)) html+=`<div class="meta-block"><span class="meta-comment">${escapeHTML(inner.replace(/^(c|comment):\s*/i,''))}</span></div>`;
             else if(/^(ci|comment_italic):/i.test(inner)) html+=`<div class="meta-block"><span class="meta-comment meta-comment-italic">${escapeHTML(inner.replace(/^(ci|comment_italic):\s*/i,''))}</span></div>`;
-            else if(!/^(title|t|artist|a|key|k|x-read|nicovideo|asin|youtube)/i.test(inner)) html+=`<div class="meta-block">${escapeHTML(inner.replace(/^(subtitle:|st:)\s*/i,''))}</div>`;
+            else if(subtitle){
+                const value=subtitle[1].trim(),key=normalizeMetaIdentity(value);
+                if(value&&!renderedSubtitleKeys.has(key)){renderedSubtitleKeys.add(key);html+=`<div class="meta-block">${escapeHTML(value)}</div>`}
+            }
+            else if(!/^(title|t|artist|a|key|k|x-read|nicovideo|asin|youtube)/i.test(inner)) html+=`<div class="meta-block">${escapeHTML(inner)}</div>`;
             return;
         }
         if(tr.startsWith('<検索用>')) return;
