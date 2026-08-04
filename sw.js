@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const CACHE = 'acrosschord-v2.4.0';
+const CACHE = 'acrosschord-v2.4.1';
 const ASSETS = [
     './',
     './index.html',

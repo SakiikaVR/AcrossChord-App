@@ -336,13 +336,6 @@ function renderScore(s){
             const token=m[1],text=m[2];
             const d=splitChordDecoration(token);
             const p=parseChordParts(d.core);
-            if(mode==='nns'){
-                const direct=getDirectNnsHTML(d.core);
-                if(direct){
-                    row+=createNnsSegment(d.pre+direct+d.post,text);
-                    continue;
-                }
-            }
             // コードとして読めないもの (小節線・記号・N.C. など) はグレー表示
             if(isNonChord(token)||noteIndex(p.root)<0){
                 if(diag) row+=`<div class="chord-segment"><div class="segment-chord seg-nc-diag">${escapeHTML(token)}</div><div class="segment-text">${escapeHTML(text)}</div></div>`;
@@ -387,13 +380,6 @@ function buildNnsHTML(root,quality,bass=''){
     if(quality)html+=`<sup class="cn-qual">${escapeHTML(quality)}</sup>`;
     if(bass)html+=`<span class="cn-slash">/</span><span class="cn-bass">${escapeHTML(bass)}</span>`;
     return html;
-}
-/* [2△7] や [7sus4add9] のように、NNSを直接入力した譜面も受け付ける。 */
-function getDirectNnsHTML(raw){
-    const text=normalizeChordText(raw).replace(/\s+/g,'');
-    const m=text.match(/^([1-7])([#b]?)(.*?)(?:\/([1-7])([#b]?))?$/);
-    if(!m)return '';
-    return buildNnsHTML(m[1]+m[2],normalizeNnsQuality(m[3]),m[4]?m[4]+m[5]:'');
 }
 function getDegreeHTML(raw,key){
     const chord=parseChordSymbol(raw);
@@ -464,8 +450,12 @@ function generateChordSvg(raw,display,mode){
         const cy=mt+(strings-1-idx)*sg;
         if(f>0){
             const fp=f-base+1;
-            if(fp>=1&&fp<=4){const cx=ml+(fp-.5)*fg;svg+=`<circle cx="${cx}" cy="${cy}" r="2.6" fill="${INK}"/>`}
-        }else if(f===0)svg+=`<circle cx="${ml/2}" cy="${cy}" r="1.8" stroke="${INK}" fill="none"/>`;
+            if(fp>=1&&fp<=4){const cx=ml+(fp-.5)*fg;svg+=`<circle class="fretted-note" cx="${cx}" cy="${cy}" r="2.6" fill="${INK}"/>`}
+        }else if(f===0){
+            // Drop D の D5 (0-0-0) のような全開放フォームも空に見えないよう、
+            // 太い開放リングと中心点をセットで描く。
+            svg+=`<circle class="open-note" cx="${ml/2}" cy="${cy}" r="2.7" stroke="${INK}" stroke-width="1.25" fill="#fff"/><circle cx="${ml/2}" cy="${cy}" r="0.75" fill="${INK}"/>`;
+        }
         else svg+=`<line x1="${ml/2-2}" y1="${cy-2}" x2="${ml/2+2}" y2="${cy+2}" stroke="${INK}"/><line x1="${ml/2+2}" y1="${cy-2}" x2="${ml/2-2}" y2="${cy+2}" stroke="${INK}"/>`;
     });
     const aria=escapeHTML(`${label} コードダイアグラム`);

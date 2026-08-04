@@ -65,12 +65,14 @@ const nnsCases={
 for(const [chord,expected] of Object.entries(nnsCases)){
     assert.equal(plain(run(`getDegreeHTML(${JSON.stringify(chord)},'C')`)),expected,chord);
 }
-assert.equal(plain(run(`getDirectNnsHTML('7sus4add9')`)),'7sus4add9');
-assert.equal(plain(run(`getDirectNnsHTML('2△7/7#')`)),'2△7/7#');
-run(`renderScore({mode:'nns',capo:0,key:'C',artist:'',content:'先頭[C6/9]A [C/G#]B [2△7]C [7sus4add9]D'})`);
+run(`renderScore({mode:'nns',capo:0,key:'C',artist:'',content:'先頭[C6/9]A [C/G#]B [Dmaj7]C [G7sus4add9]D'})`);
 const renderedNns=run(`__nodes['score-output'].innerHTML`);
 assert.doesNotMatch(renderedNns,/<svg|chord-diagram|segment-chord/, 'NNSでは図と図用領域を生成しない');
 assert.match(plain(renderedNns),/1\(69\).*1\/5#.*2△7.*7sus4add9/s);
+run(`renderScore({mode:'nns',capo:0,key:'C',artist:'',content:'[2△7]直接入力'})`);
+const rejectedDirectNns=run(`__nodes['score-output'].innerHTML`);
+assert.match(rejectedDirectNns,/class="chord-name nc"/, '数値NNSはコードとして直接解析しない');
+assert.doesNotMatch(rejectedDirectNns,/class="cn-root"/, '数値NNSをNNSコード表示へ変換しない');
 
 const tunings=['std','dropd','half','dropcs','whole','dropc','dropb'];
 const roots=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -81,8 +83,25 @@ for(const tuning of tunings){
         for(const note of roots){
             const svg=run(`generateChordSvg(${JSON.stringify(note)},${JSON.stringify(note+'5')},'power')`);
             assert.match(svg,/class="chord-diagram"/,`${tuning} ${note}5 のSVG`);
-            assert.match(svg,/<circle /,`${tuning} ${note}5 の押弦点`);
+            assert.match(svg,/class="(?:fretted-note|open-note)"/,`${tuning} ${note}5 の発音位置`);
             assert.doesNotMatch(svg,/undefined|NaN/,`${tuning} ${note}5 の無効値`);
+        }
+    }
+}
+
+run(`tuningId='dropd';powerLowOnly=false;chordSvgCache.clear()`);
+const dropDOpen=run(`generateChordSvg('D','D5','power')`);
+assert.equal((dropDOpen.match(/class="open-note"/g)||[]).length,3,'Drop DのD5は低音3弦の開放位置を明示する');
+
+for(const tuning of tunings){
+    run(`tuningId=${JSON.stringify(tuning)};powerLowOnly=false;chordSvgCache.clear()`);
+    for(const note of roots){
+        for(const suffix of ['', 'm', '7', 'maj7', 'sus4', 'add9', 'dim7', '13(#11)']){
+            const chord=note+suffix;
+            const svg=run(`generateChordSvg(${JSON.stringify(chord)},${JSON.stringify(chord)},'text')`);
+            assert.match(svg,/class="chord-diagram"/,`${tuning} ${chord} のSVG`);
+            assert.match(svg,/class="(?:fretted-note|open-note)"/,`${tuning} ${chord} の発音位置`);
+            assert.doesNotMatch(svg,/undefined|NaN/,`${tuning} ${chord} の無効値`);
         }
     }
 }
